@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super NES Homebrew — build your own game, from reset vector to .sfc</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%235fd18b%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%276%27 fill=%27none%27 stroke=%27%230c0a13%27 stroke-width=%273%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: the modern SNES homebrew toolkit (ca65, Mesen2, superfamiconv), building a complete paddle-and-ball game — Bounce — register write by register write, and shipping it to real hardware. Fourteen modules, fourteen interactive labs, including the finished game playable in your browser.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Super NES Homebrew</h1>
+        <span class="sub">A course · 14 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · The toolkit</div>
+      <a href="#homebrew"><span class="n">01</span><span>What homebrew is</span></a>
+      <a href="#toolchain"><span class="n">02</span><span>The toolchain</span></a>
+      <a href="#asm"><span class="n">03</span><span>Just enough 65816</span></a>
+      <a href="#devloop"><span class="n">04</span><span>The dev loop</span></a>
+
+      <div class="toc-group">Part II · Building &ldquo;Bounce&rdquo;</div>
+      <a href="#init"><span class="n">05</span><span>Boot: reset to a stable frame</span></a>
+      <a href="#header"><span class="n">06</span><span>The ROM header &amp; memory map</span></a>
+      <a href="#gfx"><span class="n">07</span><span>Art into bytes</span></a>
+      <a href="#upload"><span class="n">08</span><span>Uploading to the PPU</span></a>
+      <a href="#input"><span class="n">09</span><span>Reading the player</span></a>
+      <a href="#objects"><span class="n">10</span><span>Sprites: the ball &amp; paddle</span></a>
+      <a href="#gameloop"><span class="n">11</span><span>The game loop</span></a>
+      <a href="#sound"><span class="n">12</span><span>Sound, the honest version</span></a>
+
+      <div class="toc-group">Part III · Shipping it</div>
+      <a href="#debug"><span class="n">13</span><span>Debugging &amp; the accuracy gauntlet</span></a>
+      <a href="#release"><span class="n">14</span><span>Real hardware &amp; release</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-build" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · SNES homebrew</span>
+          <h2>Build your own <span class="grad">Super Nintendo</span> game.</h2>
+          <p class="lede">
+            The other four courses in this collection explain how the machine
+            works. This one hands you the keyboard. We set up the modern
+            homebrew toolkit — <strong>ca65</strong>, <strong>Mesen2</strong>,
+            <strong>superfamiconv</strong> — then build a tiny but complete
+            paddle-and-ball game called <strong>Bounce</strong>, register write
+            by register write: boot, graphics, input, sprites, the game loop,
+            sound. We finish by putting it on real hardware and releasing it.
+            Fourteen modules, <strong>fourteen live labs</strong> — including
+            the finished game, playable right now in your browser. No Nintendo
+            code, no ripped assets; everything here is yours to learn from and
+            reuse.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#homebrew">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#lab-bounce">Play the finished game</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>The toolkit</h4>
+              <p>What homebrew is (and the legal line, plainly), the assemblers and C kits people actually use, the working subset of 65816, and the edit–build–run–inspect loop with Mesen2's debugger.</p>
+              <div class="cnt">4 modules · 4 labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>Building &ldquo;Bounce&rdquo;</h4>
+              <p>The game itself, one system at a time: boot to a stable frame, the ROM header, art into bytes, DMA uploads, the joypad, sprites, the frame-locked game loop, and a sound driver.</p>
+              <div class="cnt">8 modules · 8 labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Shipping it</h4>
+              <p>The classic homebrew bugs and their symptoms, the emulator-vs-hardware accuracy gauntlet, flash carts, the release checklist, and where your second game begins.</p>
+              <div class="cnt">2 modules · 2 labs</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>The toolkit</h3>
+          <p>
+            Before a single pixel moves we get honest about what SNES homebrew
+            is in the 2020s: who does it, what's legal, and which tools are
+            actually maintained. Then we install a working vocabulary — the
+            dozen 65816 instructions you'll type every day, and the
+            edit–build–run–inspect loop that turns a text file into a running
+            cartridge image in about two seconds. If you've read the
+            <a href="../cpu/">CPU course</a>, some of this will feel like
+            meeting old friends at a workbench; if you haven't, each module
+            recaps just enough to stand on its own.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–04</b></span><span>Difficulty <b>Beginner</b></span><span>Labs <b>4 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="homebrew">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>What homebrew is</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the living SNES homebrew scene, where the legal lines actually sit, and meet Bounce — the small, complete game you will have built by Module 14.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is a fact that surprises people: <strong>new Super Nintendo
+            games ship every year</strong>. Not remakes on modern consoles —
+            new <code>.sfc</code> ROM files, written now, that run on a 1990
+            console. There's an annual <strong>SNESdev Compo</strong> run by
+            the community at <a href="https://snes.nesdev.org/">snes.nesdev.org</a>,
+            itch.io pages full of free releases, and a handful of boutique
+            publishers who will press a genuinely new game onto a real
+            cartridge with a box and a manual. The people doing this are called
+            <span class="term" data-tip="Hobbyist software written for a closed commercial platform by people outside the platform holder's official developer program — 'brewed at home' rather than licensed.">homebrewers</span>,
+            and the barrier to entry has never been lower: every tool is free,
+            every document is public, and the best SNES debugger ever made
+            (Module 04) runs on your laptop.
+          </p>
+          <p>
+            Now the question everyone asks first: <strong>is this legal?</strong>
+            Writing your own program for the Super Nintendo is exactly as legal
+            as writing one for your PC. The hardware is yours; the instruction
+            set is public; no license from Nintendo is needed to assemble bytes
+            that happen to run on their old console. What you must
+            <em>not</em> do is just as plain: don't use Nintendo's
+            <strong>assets</strong> (Mario's sprite, Zelda's tunes, the
+            official logo art), don't use their <strong>trademarks</strong>
+            (don't put &ldquo;Nintendo&rdquo; or the SNES trade dress on your
+            box as if it were licensed), and don't distribute <em>other
+            people's</em> ROMs alongside your own. Your code, your art, your
+            sound, your name on it — that combination is yours to sell or give
+            away. Every byte of the game in this course follows that rule.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Cooking in a vintage kitchen</span>
+            <p>
+              The console is a beautifully built old stove. Nobody can stop you
+              cooking your own recipes on it, and a whole club of chefs still
+              does, swapping techniques for that specific oven. What you can't
+              do is sell your dish with someone else's restaurant logo on the
+              plate, or photocopy their cookbook and hand it out. The stove is
+              fair game; the brand and the recipes are not.
+            </p>
+          </div>
+
+          <h4>The game we'll build: Bounce</h4>
+          <p>
+            Across Part II you'll build a paddle-and-ball game called
+            <strong>Bounce</strong>: one screen, a court drawn from background
+            tiles, a paddle you move with the D-pad, a ball that speeds up as
+            you rally, a score counter, and a blip when the ball connects.
+            It is deliberately tiny — and deliberately <em>complete</em>. It
+            boots from the reset vector, survives real hardware, and ends up a
+            legitimate <code>.sfc</code> file you could enter in the compo.
+            Every system a big game needs, Bounce needs too, just once each:
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Bounce needs…</th><th>Which is really…</th><th>Built in</th></tr></thead>
+              <tbody>
+                <tr><td>To turn on without garbage on screen</td><td>The canonical init sequence, forced blank, clearing VRAM/CGRAM/OAM/WRAM</td><td><a href="#init">Module 05</a></td></tr>
+                <tr><td>To be a valid cartridge</td><td>The ROM header at <code>$FFC0</code>, reset &amp; NMI vectors, a LoROM linker map</td><td><a href="#header">Module 06</a></td></tr>
+                <tr><td>A court, a paddle, a ball, digits</td><td>4bpp planar tiles, 15-bit BGR palettes, a tilemap</td><td><a href="#gfx">Module 07</a></td></tr>
+                <tr><td>That art inside the PPU</td><td>DMA to VRAM and CGRAM under forced blank, then screen on</td><td><a href="#upload">Module 08</a></td></tr>
+                <tr><td>To feel the D-pad</td><td>Auto-joypad read, <code>$4218/9</code>, the pressed/held/released idiom</td><td><a href="#input">Module 09</a></td></tr>
+                <tr><td>Things that move</td><td>A shadow OAM buffer, metasprites, the 544-byte vblank DMA</td><td><a href="#objects">Module 10</a></td></tr>
+                <tr><td>Smooth 60 fps motion</td><td>The NMI-locked game loop and 8.8 fixed-point physics</td><td><a href="#gameloop">Module 11</a></td></tr>
+                <tr><td>A blip and a loop</td><td>A real sound driver uploaded to the SPC700 over <code>$2140–3</code></td><td><a href="#sound">Module 12</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="Anatomy of a finished homebrew ROM: header, code, graphics and audio blocks inside one .sfc file, feeding the console">
+              <defs><marker id="m01a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="40" y="30" class="d-tag">bounce.sfc — one file, four kinds of bytes, all yours</text>
+              <rect x="40" y="48" width="470" height="150" rx="12" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <rect x="58" y="66" width="120" height="50" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="118" y="88" text-anchor="middle" class="d-num">code</text>
+              <text x="118" y="104" text-anchor="middle" class="d-sub">65816, from $8000</text>
+              <rect x="190" y="66" width="120" height="50" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="250" y="88" text-anchor="middle" class="d-num">graphics</text>
+              <text x="250" y="104" text-anchor="middle" class="d-sub">tiles + palettes + map</text>
+              <rect x="322" y="66" width="120" height="50" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+              <text x="382" y="88" text-anchor="middle" class="d-num">audio</text>
+              <text x="382" y="104" text-anchor="middle" class="d-sub">driver + samples</text>
+              <rect x="58" y="130" width="384" height="50" rx="8" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <text x="250" y="152" text-anchor="middle" class="d-num">header &amp; vectors · $FFC0–$FFFF</text>
+              <text x="250" y="168" text-anchor="middle" class="d-sub">title, map mode, checksum — plus where to start: the reset vector</text>
+              <line x1="514" y1="123" x2="596" y2="123" class="d-axis" stroke-width="1.8" marker-end="url(#m01a)"/>
+              <text x="555" y="112" text-anchor="middle" class="d-flow">flash cart · Module 14</text>
+              <rect x="600" y="66" width="260" height="114" rx="12" class="d-fill-panel d-good-s" stroke-width="1.6"/>
+              <text x="730" y="108" text-anchor="middle" class="d-label">Super Nintendo</text>
+              <text x="730" y="130" text-anchor="middle" class="d-sub">reads the reset vector at $FFFC…</text>
+              <text x="730" y="148" text-anchor="middle" class="d-sub">…and your game is running</text>
+              <text x="40" y="232" class="d-sub">the whole course is just filling in these boxes, left to right — then the arrow</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>A finished homebrew game is one file.</strong> Code, graphics, audio and a 64-byte header/vector block, assembled and linked into a <code>.sfc</code> image. The console (or an emulator) reads the <span class="term" data-tip="The address stored at $FFFC/$FFFD that the CPU jumps to at power-on — the very first thing your game controls.">reset vector</span> and jumps into your code. Module 06 builds the header; Module 14 supplies the arrow.</figcaption>
+          </figure>
+
+          <p>
+            Before any of that, play the ending. The lab below is Bounce —
+            simulated in your browser at the SNES's real resolution
+            (<code>256×224</code>), with colours quantised the way the console's
+            15-bit palette would (Module 07 explains the <code>$</code>-prefixed
+            hex numbers if you need a refresher — short version: base 16, one
+            digit per four bits, the <a href="../cpu/#numbers">CPU course</a>
+            teaches it from zero). Arrow keys or the on-screen buttons move the
+            paddle. By Module 14 you'll know what every piece of it costs in
+            registers, bytes and scanlines.
+          </p>
+
+          <div class="lab" id="lab-bounce">
+            <div class="lab-head"><span class="dot"></span><span class="title">The capstone, playable — this is what you'll have built by Module 14</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="bounce-stage">
+                <div>
+                  <canvas class="bounce-canvas" data-bounce-canvas tabindex="0" aria-label="Bounce — paddle and ball game. Focus and use left and right arrow keys to move the paddle."></canvas>
+                  <div class="pad-btns">
+                    <button class="pad-btn" data-bounce-left aria-label="Move paddle left">◀</button>
+                    <button class="pad-btn" data-bounce-right aria-label="Move paddle right">▶</button>
+                  </div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Status</div>
+                  <div class="stat-row" style="flex-direction:column;align-items:stretch">
+                    <div class="stat-chip">Score <b data-bounce-score>0</b></div>
+                    <div class="stat-chip">Best rally <b data-bounce-best>0</b></div>
+                    <div class="stat-chip">Balls left <b data-bounce-lives>3</b></div>
+                  </div>
+                  <div class="controls" style="margin-top:12px">
+                    <button class="play-btn" data-bounce-start>Start</button>
+                    <button class="play-btn" data-bounce-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Reset</button>
+                  </div>
+                  <div class="tc-narrate" data-bounce-msg style="margin-top:12px">Press <b>Start</b>, then move with ← → (click the screen first) or the buttons. Keep the rally going — the ball speeds up.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>SNES homebrew is a living scene: an annual compo, free releases, even new physical cartridges.</li>
+              <li>Writing and distributing your own ROM is legal; Nintendo's assets, trademarks and other people's ROMs are the lines you don't cross.</li>
+              <li>Bounce — paddle, ball, score, blip — exercises every system a big game needs, exactly once each.</li>
+              <li>A finished game is one <code>.sfc</code> file: code, graphics, audio, and a header that tells the console where to start.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#toolchain"><span class="dir">Next →</span><span class="ttl">02 · The toolchain</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="toolchain">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>The toolchain</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Choose your tools with open eyes: the assemblers and C kits the scene actually uses, the source-to-ROM build pipeline, and which emulator to develop in.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A Super Nintendo can't run your text files. Something has to turn
+            human-readable source into the exact bytes the 65816 fetches, and
+            that something is your <strong>toolchain</strong>. The mainstream
+            choice — and the one this course writes its examples in — is
+            <strong>ca65</strong>, the assembler from the
+            <span class="term" data-tip="A free, mature compiler/assembler suite for 6502-family processors. Its assembler, ca65, fully supports the 65816; its linker, ld65, places your code into a ROM image using a config file.">cc65 suite</span>,
+            paired with its linker <strong>ld65</strong>. It's free, maintained,
+            and its 65816 support (the <code>.p816</code> directive and the
+            width hints you'll meet in Module 03) is solid. Two other
+            assemblers earn their keep: <strong>WLA-DX</strong>, a multi-console
+            assembler with a long SNES pedigree, and <strong>asar</strong>,
+            which grew up in the ROM-hacking world as a patching assembler and
+            is beloved for its terse syntax. All three produce identical bytes
+            in the end; pick one and stay put.
+          </p>
+          <p>
+            Prefer C? Two real options. <strong>PVSnesLib</strong> wraps a
+            65816 C compiler (a port of tcc, <code>816-tcc</code>) in a library
+            of console routines — sprites, backgrounds, sound — so you write
+            <code>consoleInit()</code> instead of register writes.
+            <strong>libSFX</strong> sits in between: a ca65-based framework
+            that scaffolds the boring parts (init, interrupts, the build) but
+            leaves you writing assembly. The honest trade-off, and it matters
+            on a 3.58&nbsp;MHz CPU: C gets your first playable build running
+            <em>days</em> sooner, but compiled 65816 code is several times
+            slower and fatter than hand-written assembly, because the chip has
+            too few registers for a C compiler to be comfortable. Bounce is
+            small enough that we go straight to assembly and understand every
+            byte.
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Route</th><th>Tool</th><th>You get</th><th>You pay</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">asm</span></td><td><code>ca65</code> + <code>ld65</code> (cc65 suite)</td><td>Total control, best docs, linker configs, this course's syntax</td><td>You write every instruction yourself</td></tr>
+                <tr><td><span class="pill ax">asm</span></td><td><code>WLA-DX</code></td><td>Multi-console assembler, long SNES track record</td><td>Its own config dialect to learn</td></tr>
+                <tr><td><span class="pill ax">asm</span></td><td><code>asar</code></td><td>Terse syntax, patch-friendly, huge ROM-hack community</td><td>Leans patch-first; full-ROM builds need care</td></tr>
+                <tr><td><span class="pill hb">C</span></td><td><code>PVSnesLib</code> (816-tcc)</td><td>Playable prototype in a weekend, batteries included</td><td>Generated code is markedly slower and larger</td></tr>
+                <tr><td><span class="pill hb">C+asm</span></td><td><code>libSFX</code></td><td>ca65 framework: init, NMI, build scaffolding done for you</td><td>You still write 65816 for the game itself</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4>From source to .sfc</h4>
+          <p>
+            Whatever you pick, the pipeline is the same four mechanical steps,
+            and it pays to know what each one consumes and produces — because
+            each fails with a different <em>kind</em> of error message.
+            The assembler turns each source file into an
+            <span class="term" data-tip="A half-finished binary: your assembled bytes plus a list of names it defines and names it still needs. The linker resolves those names across all object files.">object file</span>;
+            the linker follows a <strong>linker config</strong> — a little map
+            saying &ldquo;code goes at <code>$8000</code>, the header at
+            <code>$FFC0</code>&rdquo; (Module 06) — to weld the objects into
+            one binary; then a pad-and-checksum step rounds the file up to a
+            clean power-of-two size and fixes the header checksum. The result
+            is a <code>.sfc</code> file: the exact bytes of a cartridge ROM.
+          </p>
+          <p>
+            You'll run that file in an emulator hundreds of times a day, so
+            choose deliberately: develop in <strong>Mesen2</strong>, which has
+            the best debugger on the platform (Module 04 is a tour), and
+            sanity-check in <strong>bsnes</strong>, whose accuracy is the
+            community reference — if it works in both, it very probably works
+            on the real console (Module 13 covers the exceptions). Click
+            through the pipeline below; each stage shows its inputs, outputs,
+            and what it sounds like when it breaks.
+          </p>
+
+          <div class="lab" id="lab-pipeline">
+            <div class="lab-head"><span class="dot"></span><span class="title">Build-pipeline explorer — click a stage to inspect it</span><span class="badge">interactive</span></div>
+            <div class="lab-body">
+              <div class="pl-row" data-pl-row></div>
+              <div class="pl-detail" data-pl-detail></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>ca65/ld65, WLA-DX and asar are the real assembler choices; PVSnesLib and libSFX are the real C-flavoured ones.</li>
+              <li>Assembly buys control and speed; C buys development pace at a real runtime cost on a 3.58 MHz CPU.</li>
+              <li>The pipeline is always: assemble → link (with a config that maps the ROM) → pad + checksum → <code>.sfc</code>.</li>
+              <li>Develop in Mesen2 for its debugger; verify in bsnes for accuracy. Passing both is the bar.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#homebrew"><span class="dir">← Prev</span><span class="ttl">01 · What homebrew is</span></a>
+            <a class="next" href="#asm"><span class="dir">Next →</span><span class="ttl">03 · Just enough 65816</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="asm">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Just enough 65816</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Not the whole CPU — the working subset a homebrewer types daily: width control, loads and stores, loops, subroutines, and the direct page as your variables.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The <a href="../cpu/">CPU course</a> teaches the 65816 properly —
+            from the fetch–decode–execute loop up through DMA. This module is
+            different: it's the <em>phrasebook</em>. Day to day, homebrew
+            assembly is maybe a dozen instructions arranged in half a dozen
+            idioms, and once your fingers know them the rest of the
+            instruction set is reference-manual material. Everything below is
+            real <strong>ca65 syntax</strong>: a file starts with
+            <code>.p816</code> to enable 65816 opcodes, <code>$</code> means
+            hexadecimal, <code>#</code> means &ldquo;this literal value&rdquo;
+            rather than &ldquo;the memory at this address&rdquo; — the single
+            most important character in the language.
+          </p>
+          <p>
+            Idiom one, the famous one: <strong>width control</strong>. The
+            65816's accumulator and index registers can each be 8-bit or
+            16-bit, switched at runtime by the M and X flags
+            (<a href="../cpu/#width">the CPU course's Module 08</a> tells the
+            full story). You flip them with <code>rep</code> (reset flag → 16-bit)
+            and <code>sep</code> (set flag → 8-bit): <code>#$20</code> targets
+            the accumulator's M flag, <code>#$10</code> the index registers'
+            X flag, <code>#$30</code> both at once. The assembler can't see
+            flags at runtime, so you <em>promise</em> it the current width with
+            <code>.a8</code>/<code>.a16</code> and <code>.i8</code>/<code>.i16</code>
+            hints — get the promise wrong and the assembler emits the wrong
+            number of operand bytes, and the CPU misreads everything after.
+            This is the classic 65816 footgun, which is why the idiom is
+            always written as a tight pair:
+          </p>
+
+          <div class="code">
+<pre><span class="c">; the width idiom — flag change and assembler hint travel together</span>
+  <span class="k">sep</span> <span class="n">#$20</span>        <span class="c">; M=1 → A is 8-bit…</span>
+<span class="k">.a8</span>                <span class="c">; …and ca65 is told so</span>
+  <span class="k">lda</span> <span class="n">#$8F</span>        <span class="c">; one operand byte: $8F</span>
+  <span class="k">rep</span> <span class="n">#$20</span>        <span class="c">; M=0 → A is 16-bit…</span>
+<span class="k">.a16</span>               <span class="c">; …hint updated in the same breath</span>
+  <span class="k">lda</span> <span class="n">#$0180</span>      <span class="c">; two operand bytes: $80 $01 (little-endian)</span></pre>
+            <div class="cap">rep/sep + hint, always as a pair. <code>#$20</code> = accumulator width, <code>#$10</code> = index width, <code>#$30</code> = both.</div>
+          </div>
+
+          <p>
+            Idiom two: <strong>your variables live in the direct page</strong>.
+            The 65816 can address one page of bank 0 with one-byte operands —
+            faster to fetch, quicker to run
+            (<a href="../cpu/#addressing">addressing modes</a>, if you want the
+            mechanics). Homebrewers treat it as the global-variable area:
+            declare a name for an address once, then use it like a variable.
+            <code>lda ball_x</code> reads the variable;
+            <code>lda #$28</code> loads the <em>number</em> $28. Idiom three:
+            <strong>loops count down</strong>, because <code>dex</code> sets
+            the flags for free and <code>bne</code> (branch if not equal to
+            zero) or <code>bpl</code> (branch if plus) close the loop with no
+            separate compare. And idiom four: <code>jsr</code> calls a
+            subroutine, <code>rts</code> returns, with the return address kept
+            on <a href="../cpu/#stack">the stack</a>.
+          </p>
+
+          <div class="code">
+<pre><span class="c">; the daily idioms in one place</span>
+<span class="lb">ball_x</span>  = <span class="n">$20</span>      <span class="c">; a direct-page address, named — your "variable"</span>
+
+  <span class="k">lda</span> <span class="n">#40</span>         <span class="c">; A ← the number 40 (immediate)</span>
+  <span class="k">sta</span> <span class="lb">ball_x</span>      <span class="c">; the byte at $20 ← A (store to memory)</span>
+
+  <span class="k">ldx</span> <span class="n">#$0F</span>        <span class="c">; loop counter: 15 down to 0…</span>
+<span class="lb">clear:</span>
+  <span class="k">stz</span> <span class="n">$0200</span>,x     <span class="c">; store zero at $0200+X</span>
+  <span class="k">dex</span>              <span class="c">; X = X − 1, flags set for free</span>
+  <span class="k">bpl</span> <span class="lb">clear</span>       <span class="c">; …branch while X is still ≥ 0</span>
+
+  <span class="k">jsr</span> <span class="lb">move_ball</span>   <span class="c">; call — return address pushed for us</span>
+  <span class="c">; …</span>
+<span class="lb">move_ball:</span>
+  <span class="k">rts</span>              <span class="c">; return to just after the jsr</span></pre>
+            <div class="cap">Loads, stores, a count-down loop, a subroutine. This is most of what Bounce's source looks like.</div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The phrasebook</span>
+            <p>
+              You don't learn a whole language before ordering coffee abroad —
+              you learn twelve phrases and use them constantly, and fluency
+              grows from there. The 65816 has 256 opcodes; a homebrewer's
+              daily set is <code>lda sta stz ldx ldy inc dec dex bne bpl jsr
+              rts</code> plus the <code>rep/sep</code> pair. Learn those as
+              reflexes here, and read the
+              <a href="../cpu/">full grammar</a> when an instruction surprises
+              you.
+            </p>
+          </div>
+
+          <p>
+            The lab below is that phrasebook running. It's a real fragment of
+            init-and-scorekeeping code: clear a 16-byte buffer with a
+            count-down loop in 8-bit mode, then switch the accumulator to
+            16-bit and sum three score words. Step it and watch the registers,
+            the flags (including M flipping the accumulator's width mid-run)
+            and the memory bytes change — the same visible-machine format as
+            the <a href="../cpu/#loop">CPU course's toy CPU</a>, but with the
+            real instructions you'll type.
+          </p>
+
+          <div class="lab" id="lab-asm">
+            <div class="lab-head"><span class="dot"></span><span class="title">65816 playground — step a real ca65 fragment</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="asm-grid">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Source · ca65</div>
+                  <div class="asm-list" data-asm-list></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Registers</div>
+                  <div class="tc-regs" data-asm-regs></div>
+                  <div class="lab-sub" style="margin:12px 0 6px">Status flags · P</div>
+                  <div class="flag-row" data-asm-flags></div>
+                  <div class="lab-sub" style="margin:12px 0 0">Memory · bank $00</div>
+                  <div class="mem-rows" data-asm-mem></div>
+                </div>
+              </div>
+              <div class="tc-narrate" data-asm-narrate>Press <b>Step</b> to run one instruction, or <b>Run</b> to let it fly.</div>
+              <div class="controls">
+                <button class="play-btn" data-asm-step>Step</button>
+                <button class="play-btn" data-asm-run style="background:linear-gradient(180deg,#a884ff,#7d5cf0);color:#120c22">Run</button>
+                <button class="play-btn" data-asm-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Reset</button>
+                <span style="font-size:12.5px;color:var(--muted)">Cyan = memory read · magenta = memory written · amber flags are set.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><code>#</code> means a literal value; no <code>#</code> means the memory at that address. Most beginner bugs are this line.</li>
+              <li><code>rep/sep #$20/#$10/#$30</code> switch register widths; <code>.a8/.a16/.i8/.i16</code> keep the assembler's promise in sync — always change both together.</li>
+              <li>Name direct-page addresses and treat them as your variables; they're the fastest memory the CPU has.</li>
+              <li>Count loops down with <code>dex</code>/<code>bpl</code>; structure code with <code>jsr</code>/<code>rts</code>. That's most of a real game's texture.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#toolchain"><span class="dir">← Prev</span><span class="ttl">02 · The toolchain</span></a>
+            <a class="next" href="#devloop"><span class="dir">Next →</span><span class="ttl">04 · The dev loop</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="devloop">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>The dev loop</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Make the edit→build→run→inspect cycle a two-second reflex, and learn Mesen2's debugger — especially the event viewer, which plots your register writes onto the video frame itself.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Professional SNES teams in 1992 burned EPROMs and walked them
+            across the office. You have it absurdly better: your loop is
+            <strong>edit → build → run → inspect</strong>, and a Bounce-sized
+            project builds in well under a second. Put the whole pipeline from
+            Module 02 behind one command — a three-line script or Makefile
+            that runs <code>ca65</code>, <code>ld65</code> and the checksum
+            fix, then launches the ROM — and bind it to a key in your editor.
+            The tighter this loop, the more experiments per hour, and
+            experiments per hour is the real speed stat of a homebrewer.
+          </p>
+          <p>
+            The &ldquo;inspect&rdquo; step is where <strong>Mesen2</strong>
+            earns its place. It isn't just an emulator; it's an X-ray machine
+            for the running console. The tools you'll live in:
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Tool</th><th>What it shows</th><th>You'll use it when…</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">Debugger</span></td><td>Source-level stepping, breakpoints on execute/read/write of any address</td><td>&ldquo;Why did <code>ball_x</code> become $FF?&rdquo; — break on write to it</td></tr>
+                <tr><td><span class="pill ax">Memory viewer</span></td><td>Live WRAM/VRAM/CGRAM/OAM hex, editable while running</td><td>Watching your variables change in real time</td></tr>
+                <tr><td><span class="pill axwii">Tilemap / tile / sprite viewers</span></td><td>The PPU's actual state, decoded into pictures</td><td>&ldquo;Did my tiles even arrive in VRAM?&rdquo; (Module 08)</td></tr>
+                <tr><td><span class="pill axwii">Palette viewer</span></td><td>All 256 CGRAM colours as swatches</td><td>Wrong colours — bad data, or bad palette index?</td></tr>
+                <tr><td><span class="pill zelda">Event viewer</span></td><td>Every register write/read plotted on the frame, at the beam position where it happened</td><td>Timing bugs — the SNES's whole personality (lab below)</td></tr>
+                <tr><td><span class="pill util">Trace logger</span></td><td>Every executed instruction with registers, to a file</td><td>The bug you can't catch live — search the log afterwards</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The one to understand deeply is the <strong>event viewer</strong>,
+            because it makes the console's time <em>visible</em>. A video frame
+            isn't an instant — the beam sweeps
+            <span class="term" data-tip="An NTSC SNES frame is 262 scanlines of 341 dot-clocks each; lines 0–224 are drawn to the screen, lines 225–261 are the vertical blanking interval when the PPU isn't reading its memories.">262 scanlines</span>
+            top to bottom, and only during <strong>vblank</strong> (lines
+            225–261) is the PPU's memory safe to touch. The event viewer draws
+            one full frame as a grid — 341 dots wide, 262 lines tall — and
+            plots a dot at the exact beam position of every register write.
+            Healthy homebrew looks like this: a clean burst of DMA and OAM dots
+            packed into the vblank band, and <em>nothing</em> in the picture
+            area. A write glowing mid-screen is a bug you can literally see
+            (Module 11 explains the frame contract; Module 13 shows the
+            wreckage).
+          </p>
+          <p>
+            And the humblest trick of all, straight from print-debugging: keep
+            a <strong>debug byte</strong> in WRAM. Write a different value at
+            each phase of your boot code — <code>$01</code> after init,
+            <code>$02</code> after upload, <code>$03</code> in the main loop —
+            and when the screen stays black, one glance at that byte in the
+            memory viewer tells you how far you got. It costs one
+            <code>sta</code> and has un-stuck a thousand black screens.
+          </p>
+
+          <div class="lab" id="lab-events">
+            <div class="lab-head"><span class="dot"></span><span class="title">Event-viewer mock — one frame, every write plotted where the beam was</span><span class="badge">simulated</span></div>
+            <div class="lab-body">
+              <canvas class="ev-canvas" data-ev-canvas aria-label="A 341 by 262 frame grid with register write events plotted"></canvas>
+              <div class="ev-legend" data-ev-legend></div>
+              <div class="tc-narrate" data-ev-narrate>All categories on. This is a <b>healthy</b> Bounce frame: everything lands in the vblank band.</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>One command from source to running ROM; bind it to a key. Iteration speed is the real speed stat.</li>
+              <li>Mesen2's debugger, memory viewer and PPU viewers answer &ldquo;what is the console's actual state?&rdquo; directly.</li>
+              <li>The event viewer plots writes at their beam position — timing bugs become visible dots in the picture area.</li>
+              <li>A WRAM debug byte — one <code>sta</code> per boot phase — is the fastest black-screen diagnostic there is.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#asm"><span class="dir">← Prev</span><span class="ttl">03 · Just enough 65816</span></a>
+            <a class="next" href="#init"><span class="dir">Next →</span><span class="ttl">05 · Boot: reset to a stable frame</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>Building &ldquo;Bounce&rdquo;</h3>
+          <p>
+            Eight modules, one game. We start at the reset vector with a
+            machine in an unknown state and end with a paddle game running at a
+            locked 60 frames per second with sound. The order is the order you
+            really build in: boot cleanly, be a valid cartridge, make art,
+            upload it, read the pad, move sprites, close the loop, add the
+            blip. Every register address in this part is real, every code
+            fragment is honest ca65, and every module's lab lets you operate
+            the mechanism yourself before you trust it in your game.
+          </p>
+          <div class="part-meta"><span>Modules <b>05–12</b></span><span>Difficulty <b>Hands-on</b></span><span>Labs <b>8 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="init">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part II</span></span>
+          <h3>Boot: from reset to a stable frame</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Walk the canonical init sequence — native mode, stack, forced blank, clear everything — and understand why every skipped step has a specific, visible failure.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Power on. The CPU reads the
+            <span class="term" data-tip="The 16-bit address stored at $FFFC/$FFFD. At power-on or reset the CPU starts executing at this address — the entry point of your entire game.">reset vector</span>
+            and jumps to your code — and at that moment <em>nothing else is
+            promised</em>. The console wakes in the 6502-compatible
+            <strong>emulation mode</strong>; the stack pointer is wherever it
+            landed; and VRAM, CGRAM, OAM and WRAM hold whatever the silicon
+            happened to power up as. Here is the trap that catches every
+            beginner: <strong>emulators often clear that memory for you.
+            Hardware does not.</strong> Real chips wake full of
+            semi-random garbage that differs run to run and console to console
+            — so a game that skips initialisation can look perfect in an
+            emulator and boot into a screenful of static on the real machine
+            (Module 13 returns to this with a checklist). The cure is a fixed
+            ritual, the same in almost every SNES game ever shipped:
+          </p>
+
+          <div class="code">
+<pre><span class="lb">reset:</span>
+  <span class="k">sei</span>              <span class="c">; 1 · no interrupts while the world is half-built</span>
+  <span class="k">clc</span>
+  <span class="k">xce</span>              <span class="c">; 2 · leave 6502 emulation mode → native 65816</span>
+  <span class="k">rep</span> <span class="n">#$10</span>        <span class="c">; 3 · 16-bit index registers…</span>
+  <span class="k">sep</span> <span class="n">#$20</span>        <span class="c">;     …8-bit accumulator (the classic setup)</span>
+<span class="k">.a8</span>
+<span class="k">.i16</span>
+  <span class="k">ldx</span> <span class="n">#$1FFF</span>
+  <span class="k">txs</span>              <span class="c">; 4 · stack at $1FFF, top of low WRAM</span>
+  <span class="k">lda</span> <span class="n">#$8F</span>
+  <span class="k">sta</span> <span class="n">$2100</span>       <span class="c">; 5 · INIDISP: forced blank ON, brightness 15</span>
+  <span class="k">jsr</span> <span class="lb">clear_vram</span>   <span class="c">; 6 · 64 KB of $00 → VRAM   (DMA, Module 08)</span>
+  <span class="k">jsr</span> <span class="lb">clear_cgram</span>  <span class="c">;     512 bytes → CGRAM: all colours black</span>
+  <span class="k">jsr</span> <span class="lb">clear_oam</span>    <span class="c">;     544 bytes → OAM: no stray sprites</span>
+  <span class="k">jsr</span> <span class="lb">clear_wram</span>   <span class="c">;     128 KB of $00 → WRAM: variables known</span>
+  <span class="c">; 7 · now upload real graphics & set the video mode (Module 08)…</span>
+  <span class="c">; 8 · …and only then: screen on</span>
+  <span class="k">lda</span> <span class="n">#$0F</span>
+  <span class="k">sta</span> <span class="n">$2100</span>       <span class="c">; INIDISP: forced blank OFF, full brightness</span></pre>
+            <div class="cap">The canonical boot. <code>$2100</code> is INIDISP: bit 7 is forced blank, low 4 bits are brightness — $8F = blanked, $0F = shining.</div>
+          </div>
+
+          <p>
+            Two steps deserve a closer look. <code>clc</code>&nbsp;+&nbsp;<code>xce</code>
+            swaps the carry flag into the hidden E bit, dropping the CPU into
+            native 65816 mode — until then, half the instruction set isn't
+            yours. And <strong>forced blank</strong> (<code>$2100 = $8F</code>)
+            is the master safety switch: bit 7 tells the PPU to stop displaying
+            <em>and release its memories</em>, so you can write VRAM and CGRAM
+            freely at any beam position. The whole of the init and upload
+            happens behind this curtain; <code>$2100 = $0F</code> at the end is
+            the curtain going up. Skip a clearing step and the failure is
+            wonderfully specific: uncleared VRAM is a screen of garbage tiles,
+            uncleared CGRAM is right shapes in fever-dream colours, uncleared
+            OAM is 128 junk sprites crowding the picture, and an unset stack
+            crashes on the first <code>jsr</code> — before anything appears at
+            all.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The pre-flight checklist</span>
+            <p>
+              Pilots don't inspect the plane in whatever order feels right —
+              the checklist exists because each skipped line has a known,
+              specific consequence, and some lines only make sense after
+              others. Boot code is the same: forced blank before touching
+              video memory, stack before the first call, clear before use.
+              Run the list, every time, in order. Every SNES programmer's
+              &ldquo;it works on my machine but not on hardware&rdquo; story
+              ends at a skipped line.
+            </p>
+          </div>
+
+          <p>
+            The lab makes each omission visible. All the steps are ticked and
+            the TV shows Bounce's title screen; untick any of them and the
+            output degrades exactly the way it would on real hardware —
+            including the one failure the TV <em>can't</em> show you, which is
+            the point of it.
+          </p>
+
+          <div class="lab" id="lab-init">
+            <div class="lab-head"><span class="dot"></span><span class="title">Init-sequence simulator — skip a step, see the damage</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="init-grid">
+                <div class="init-list" data-init-list></div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">What the TV shows</div>
+                  <canvas class="tv" data-init-tv aria-label="Simulated TV output for the chosen init sequence"></canvas>
+                  <div class="tv-notes" data-init-notes></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>At reset, nothing is initialised — and hardware, unlike most emulators, wakes full of garbage.</li>
+              <li><code>sei</code>, <code>clc/xce</code>, width setup, stack: four instructions before anything else is safe.</li>
+              <li>Forced blank (<code>$2100 = $8F</code>) frees the PPU's memories for writing; <code>$0F</code> raises the curtain when — and only when — everything is ready.</li>
+              <li>Clear VRAM, CGRAM, OAM and WRAM every boot; each skipped clear has its own signature failure.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#devloop"><span class="dir">← Prev</span><span class="ttl">04 · The dev loop</span></a>
+            <a class="next" href="#header"><span class="dir">Next →</span><span class="ttl">06 · The ROM header &amp; memory map</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="header">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part II</span></span>
+          <h3>The ROM header &amp; memory map</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Choose LoROM, fill in the 32-byte header at $FFC0 and the interrupt vectors behind it, and write the linker config that puts your code at $8000.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A ROM file isn't valid just because the code is right — the console
+            and every emulator first look at a small block of metadata baked
+            into the cartridge: the <strong>internal header</strong>. For
+            Bounce we choose <strong>LoROM</strong>, the simplest of the SNES's
+            cartridge wirings: your ROM appears in the upper half
+            (<code>$8000–$FFFF</code>) of each 64&nbsp;KB
+            <span class="term" data-tip="The 65816's 16 MB address space is divided into 256 banks of 64 KB each; the top 8 bits of a 24-bit address name the bank.">bank</span>,
+            32&nbsp;KB per bank, which is why homebrew code classically starts
+            at <code>$8000</code>. (Why banks exist at all is
+            <a href="../cpu/#banks">the CPU course's Module 09</a>; how LoROM,
+            HiROM and the exotic maps differ is the
+            <a href="../cart/#maps">cartridge course's Module 04</a> — here we
+            just pick the simple one and move.)
+          </p>
+          <p>
+            The header lives at <code>$FFC0–$FFDF</code> of the first bank:
+            21 bytes of ASCII <strong>title</strong>, then one byte each for
+            the <strong>map mode</strong> (<code>$20</code> = LoROM at normal
+            &ldquo;slow&rdquo; speed), the <strong>chipset</strong>
+            (<code>$00</code> = ROM only — no save RAM, no
+            <a href="../cart/#chips">co-processor</a>), the <strong>ROM
+            size</strong> (as a power of two: the byte is
+            log<sub>2</sub> of the size in KB, so 256&nbsp;KB → <code>$08</code>),
+            the <strong>RAM size</strong> (<code>$00</code> — Bounce saves
+            nothing), the <strong>region</strong>, a developer ID, a version —
+            and then the famous pair: the <strong>checksum</strong> and its
+            <strong>complement</strong>, two 16-bit values that must sum to
+            <code>$FFFF</code>. The checksum is simply every byte of the ROM
+            added up, truncated to 16 bits; emulators warn when it's wrong,
+            and some flash-cart menus nag. Your build script fixes it as the
+            final step (Module 14), so during development you mostly ignore
+            the nag.
+          </p>
+          <p>
+            Directly after the header sit the <strong>interrupt vectors</strong>
+            (<code>$FFE0–$FFFF</code>): little slots holding the address the
+            CPU should jump to for each event. Only three matter to Bounce:
+            the native-mode <strong>NMI</strong> vector at <code>$FFEA</code>
+            (your once-per-frame vblank handler — the heartbeat of Module 11),
+            the native <strong>IRQ</strong> vector at <code>$FFEE</code>
+            (point it at a bare <code>rti</code> until you need it), and the
+            emulation-mode <strong>RESET</strong> vector at <code>$FFFC</code>
+            — the power-on entry, which is in the <em>emulation</em> set
+            because that's the mode the console wakes in
+            (<a href="../cpu/#interrupts">interrupts, from zero</a>).
+          </p>
+
+          <h4>Telling the linker where everything goes</h4>
+          <p>
+            In ca65 you don't <em>place</em> any of this yourself — you name
+            segments in source (<code>.segment "CODE"</code>,
+            <code>"HEADER"</code>, <code>"VECTORS"</code>) and the
+            <strong>ld65 config</strong> pins them to addresses. This is the
+            file that makes &ldquo;code at $8000, header at $FFC0&rdquo; true:
+          </p>
+
+          <div class="code">
+<pre><span class="c"># bounce.cfg — a minimal LoROM map for ld65</span>
+<span class="lb">MEMORY</span> {
+    ROM:  start = <span class="n">$8000</span>, size = <span class="n">$8000</span>, fill = yes, file = <span class="n">%O</span>;
+}
+<span class="lb">SEGMENTS</span> {
+    CODE:    load = ROM, start = <span class="n">$8000</span>;
+    RODATA:  load = ROM;                  <span class="c"># graphics data, tables</span>
+    HEADER:  load = ROM, start = <span class="n">$FFC0</span>;  <span class="c"># the 32 bytes below</span>
+    VECTORS: load = ROM, start = <span class="n">$FFE0</span>;  <span class="c"># the jump table</span>
+}</pre>
+            <div class="cap">One 32 KB bank, filled and written to the output file. Bigger games add more ROM areas — same idea, more lines.</div>
+          </div>
+
+          <p>
+            Build the block yourself below: type a title, pick the fields, and
+            watch the 64 bytes at <code>$FFC0–$FFFF</code> assemble live —
+            with the checksum/complement pair recomputed on every keystroke.
+          </p>
+
+          <div class="lab" id="lab-header">
+            <div class="lab-head"><span class="dot"></span><span class="title">Header &amp; vector builder — 64 bytes, live</span><span class="badge">interactive</span></div>
+            <div class="lab-body">
+              <div class="hdr-grid">
+                <div>
+                  <div class="fld">
+                    <label for="hdr-title-in">Title · 21 chars, ASCII, space-padded</label>
+                    <input class="hdr-txt" id="hdr-title-in" data-hdr-title maxlength="21" value="BOUNCE" spellcheck="false">
+                  </div>
+                  <div class="fld">
+                    <label>Map mode · $FFD5</label>
+                    <select data-hdr-map>
+                      <option value="32" selected>$20 — LoROM, slow (2.68 MHz)</option>
+                      <option value="48">$30 — LoROM, FastROM (3.58 MHz)</option>
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label>Chipset · $FFD6</label>
+                    <select data-hdr-chip>
+                      <option value="0" selected>$00 — ROM only</option>
+                      <option value="1">$01 — ROM + RAM</option>
+                      <option value="2">$02 — ROM + RAM + battery</option>
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label>ROM size · $FFD7 (log₂ of KB)</label>
+                    <select data-hdr-rom>
+                      <option value="5">$05 — 32 KB</option>
+                      <option value="8" selected>$08 — 256 KB</option>
+                      <option value="10">$0A — 1 MB</option>
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label>Region · $FFD9</label>
+                    <select data-hdr-region>
+                      <option value="0">$00 — Japan (NTSC)</option>
+                      <option value="1" selected>$01 — North America (NTSC)</option>
+                      <option value="2">$02 — Europe (PAL)</option>
+                    </select>
+                  </div>
+                  <div class="stat-row">
+                    <div class="stat-chip">Checksum <b data-hdr-sum>—</b></div>
+                    <div class="stat-chip">Complement <b data-hdr-cpl>—</b></div>
+                    <div class="stat-chip ok">Pair sum <b>$FFFF</b></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">$FFC0–$FFFF · assembled live</div>
+                  <div data-hdr-dump></div>
+                  <div class="hdr-legend">
+                    <span><span class="sw" style="background:var(--cyan)"></span>title</span>
+                    <span><span class="sw" style="background:var(--amber)"></span>map/chip/size/region</span>
+                    <span><span class="sw" style="background:var(--magenta)"></span>checksum pair</span>
+                    <span><span class="sw" style="background:var(--good)"></span>vectors (NMI $FFEA · RESET $FFFC)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>LoROM: ROM in the top 32 KB of each bank, code from <code>$8000</code> — the simplest map, and plenty for Bounce.</li>
+              <li>The header at <code>$FFC0</code>: 21-char title, map mode <code>$20</code>, chipset, sizes, region — and a checksum/complement pair summing to <code>$FFFF</code>.</li>
+              <li>Vectors at <code>$FFE0–$FFFF</code> point the CPU at your handlers: NMI at <code>$FFEA</code>, power-on RESET at <code>$FFFC</code> (in the emulation set).</li>
+              <li>The ld65 config is where addresses become real: segments in source, placement in one small file.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#init"><span class="dir">← Prev</span><span class="ttl">05 · Boot: reset to a stable frame</span></a>
+            <a class="next" href="#gfx"><span class="dir">Next →</span><span class="ttl">07 · Art into bytes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="gfx">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Art into bytes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn drawings into the PPU's native food: 4bpp planar tiles, 15-bit BGR palette words, and a tilemap for the court — with the real conversion tools.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The PPU doesn't know what a PNG is. Everything it draws is built
+            from <strong>8×8 tiles</strong> whose pixels are <em>palette
+            indices</em>, not colours — the
+            <a href="../graphics/#tiles">graphics course</a> builds this idea
+            from zero if it's new to you. For Bounce we need exactly four
+            drawings: a wall tile for the court, a 16×16 ball, a 32×8 paddle
+            (Module 10 splits it into sprites), and a set of score digits.
+            Draw them in any editor you like at 1:1 pixels, few colours. The
+            interesting part — the part this module exists for — is what
+            those pixels become inside the ROM.
+          </p>
+          <p>
+            Backgrounds and sprites in Bounce's video mode use
+            <strong>4bpp</strong> — four bits per pixel, so each pixel picks
+            one of 16 palette entries. But the four bits of a pixel are
+            <em>not stored together</em>. The SNES stores tiles as
+            <span class="term" data-tip="A format where each bit-position of every pixel is collected into its own byte: one byte holds bit 0 of all 8 pixels in a row, another holds bit 1, and so on. The PPU reads planes in parallel; humans mostly convert with tools.">bitplanes</span>:
+            byte one holds bit 0 of all eight pixels in a row, byte two holds
+            bit 1, and planes 2 and 3 follow later in the tile. Here's one
+            row, worked by hand. Say the eight pixels of the ball's top edge
+            use palette indices <code>0 1 2 3 3 2 1 0</code>:
+          </p>
+
+          <div class="example">
+            <span class="lbl">Worked example · one 4bpp row, by hand</span>
+            <p>
+              Write each index in binary (two bits are enough here):
+              <code>00 01 10 11 11 10 01 00</code>. Now read <em>vertically</em>.
+              Bit&nbsp;0 of each pixel, left to right, is
+              <code>0 1 0 1 1 0 1 0</code> → the byte <code>%01011010</code> =
+              <code>$5A</code>. Bit&nbsp;1 of each pixel is
+              <code>0 0 1 1 1 1 0 0</code> → <code>%00111100</code> =
+              <code>$3C</code>. Bits 2 and 3 are all zero (we only used
+              indices 0–3), so planes 2 and 3 contribute <code>$00 $00</code>.
+            </p>
+            <p>
+              In the tile's 32 bytes, planes 0 and 1 interleave row by row in
+              the first 16 bytes, planes 2 and 3 in the second 16. So this row
+              contributes <code>$5A $3C</code> at offsets 0–1 and
+              <code>$00 $00</code> at offsets 16–17. Nobody converts art by
+              hand twice — but having done it <em>once</em>, the tile viewer's
+              hex will never look like noise again.
+            </p>
+          </div>
+
+          <p>
+            Colours travel separately. A palette entry is a 15-bit
+            <strong>BGR</strong> word — five bits each of blue, green, red,
+            packed <code>%0BBBBBGGGGGRRRRR</code>
+            (<a href="../graphics/#palettes">palettes and CGRAM</a>). A
+            worked one: a sky blue with red 8, green 16, blue 24 becomes
+            (24&nbsp;≪&nbsp;10)&nbsp;|&nbsp;(16&nbsp;≪&nbsp;5)&nbsp;|&nbsp;8 =
+            <code>$6208</code>. Five bits per channel is why SNES art has that
+            particular chunky-velvet colour feel — and why your art tool's
+            #FF7F00 will land on the nearest of 32 steps per channel. Bounce
+            keeps to <strong>two palettes</strong> — one for the court, one
+            for the sprites — which is both period-authentic discipline and
+            fewer bytes to upload.
+          </p>
+          <p>
+            The court itself is a <strong>tilemap</strong>: a 32×32 grid of
+            16-bit entries, each naming a tile number, a palette, and flip
+            bits (<a href="../graphics/#tilemaps">tilemaps</a>). One wall tile,
+            flipped and repeated, draws the whole arena — the oldest trick in
+            console graphics. In practice the conversion is one tool call:
+            <strong>superfamiconv</strong> eats a PNG and emits tiles, palette
+            and map (<code>superfamiconv -i court.png -t court.chr -p
+            court.pal -m court.map</code>), and <strong>YY-CHR</strong> lets
+            you open the resulting <code>.chr</code> and nudge pixels directly.
+            Both free, both standard kit. The lab below is the whole story in
+            miniature: draw, and watch the exact planar bytes and BGR15 words
+            appear — then download them as a ca65 source file.
+          </p>
+
+          <div class="lab" id="lab-pixels">
+            <div class="lab-head"><span class="dot"></span><span class="title">Pixel-to-planar editor — draw a 16×16 sprite, get real bytes</span><span class="badge">interactive · generates code</span></div>
+            <div class="lab-body">
+              <div class="px-grid">
+                <div>
+                  <canvas class="px-canvas" width="288" height="288" data-px-canvas aria-label="16 by 16 pixel drawing grid"></canvas>
+                  <div class="px-pal" data-px-pal></div>
+                  <div class="controls" style="margin-top:12px">
+                    <button class="play-btn" data-px-preset="ball" style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Ball</button>
+                    <button class="play-btn" data-px-preset="brick" style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Wall tile</button>
+                    <button class="play-btn" data-px-preset="clear" style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Clear</button>
+                  </div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">On the court · 1:1 pixels</div>
+                  <canvas class="px-preview" width="48" height="48" data-px-preview aria-hidden="true"></canvas>
+                  <div class="lab-sub" style="margin:14px 0 6px">Palette · BGR15 words</div>
+                  <div class="float-read" data-px-read></div>
+                  <div class="controls" style="margin-top:12px">
+                    <button class="play-btn" data-px-dl>Download bounce_gfx.s</button>
+                    <span style="font-size:12px;color:var(--muted)">generated in your browser — nothing leaves the page</span>
+                  </div>
+                </div>
+              </div>
+              <div class="code px-out" style="margin:0">
+                <pre data-px-bytes></pre>
+                <div class="cap">The exact <code>.byte</code> stream ca65 will assemble: four 8×8 tiles (32 bytes each, planes 0/1 then 2/3), then the palette as <code>.word</code> BGR15 values.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>All SNES art is 8×8 tiles of palette indices; Bounce needs four drawings and two palettes, total.</li>
+              <li>4bpp planar: bit <em>n</em> of every pixel in a row shares a byte; planes 0/1 interleave first, 2/3 second. You decoded a row by hand once — that's enough.</li>
+              <li>Colours are 15-bit <code>%0BBBBBGGGGGRRRRR</code> words: five bits per channel, 32 steps each.</li>
+              <li>superfamiconv converts PNGs to tiles/palette/map; YY-CHR edits the binary directly. The tilemap repeats one wall tile into a whole court.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#header"><span class="dir">← Prev</span><span class="ttl">06 · The ROM header &amp; memory map</span></a>
+            <a class="next" href="#upload"><span class="dir">Next →</span><span class="ttl">08 · Uploading to the PPU</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="upload">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>Uploading to the PPU</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Move Bounce's tiles, palette and map into VRAM and CGRAM with DMA under forced blank, configure BG mode 1, and raise the curtain.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Your art is now bytes in the ROM — but the PPU can't draw from ROM.
+            It draws only from its own memories:
+            <span class="term" data-tip="The PPU's private 64 KB of video RAM, holding tiles and tilemaps. The CPU can only reach it through the $2116–$2119 ports.">VRAM</span>
+            for tiles and maps,
+            <span class="term" data-tip="Colour-generator RAM: 256 palette entries of 15-bit BGR each — 512 bytes, reached through ports $2121/$2122.">CGRAM</span>
+            for palettes (the <a href="../graphics/#vram">graphics course</a>
+            maps this plumbing in detail). Copying kilobytes with a CPU loop
+            would take ages, so we use the 5A22's
+            <span class="term" data-tip="Direct Memory Access — the CPU halts and dedicated hardware streams bytes from the A-bus (your ROM/RAM) to a B-bus port ($21xx) at one byte per ~8 master cycles.">DMA</span>
+            engine — one byte every eight master cycles, an order of magnitude
+            faster than loads and stores
+            (<a href="../cpu/#dma">the CPU course's Module 10</a> is the deep
+            dive). All of it happens behind the forced blank we set up in
+            Module 05: with the screen off, VRAM and CGRAM are yours at any
+            moment. Here is the real sequence, register by register:
+          </p>
+
+          <div class="code">
+<pre><span class="c">; -- palette → CGRAM ------------------------------------------</span>
+  <span class="k">stz</span> <span class="n">$2121</span>       <span class="c">; CGADD: start at colour 0</span>
+  <span class="k">lda</span> <span class="n">#$00</span>
+  <span class="k">sta</span> <span class="n">$4300</span>       <span class="c">; DMAP0: mode 0 — one byte to one port, A→B</span>
+  <span class="k">lda</span> <span class="n">#$22</span>
+  <span class="k">sta</span> <span class="n">$4301</span>       <span class="c">; BBAD0: B-bus target $2122 (CGDATA)</span>
+  <span class="k">ldx</span> <span class="n">#.loword(pal)</span>
+  <span class="k">stx</span> <span class="n">$4302</span>       <span class="c">; A1T0: source address (low 16)…</span>
+  <span class="k">lda</span> <span class="n">#^pal</span>
+  <span class="k">sta</span> <span class="n">$4304</span>       <span class="c">; …and source bank</span>
+  <span class="k">ldx</span> <span class="n">#32</span>
+  <span class="k">stx</span> <span class="n">$4305</span>       <span class="c">; DAS0: 32 bytes = 16 colours</span>
+  <span class="k">lda</span> <span class="n">#$01</span>
+  <span class="k">sta</span> <span class="n">$420B</span>       <span class="c">; MDMAEN: fire channel 0 — CPU pauses, bytes fly</span>
+
+<span class="c">; -- tiles → VRAM ---------------------------------------------</span>
+  <span class="k">lda</span> <span class="n">#$80</span>
+  <span class="k">sta</span> <span class="n">$2115</span>       <span class="c">; VMAIN: increment after high-byte write</span>
+  <span class="k">ldx</span> <span class="n">#$0000</span>
+  <span class="k">stx</span> <span class="n">$2116</span>       <span class="c">; VMADD: VRAM word address 0</span>
+  <span class="k">lda</span> <span class="n">#$01</span>
+  <span class="k">sta</span> <span class="n">$4300</span>       <span class="c">; DMAP0: mode 1 — two bytes to two ports…</span>
+  <span class="k">lda</span> <span class="n">#$18</span>
+  <span class="k">sta</span> <span class="n">$4301</span>       <span class="c">; …$2118/$2119 (VMDATA low/high)</span>
+  <span class="c">; source = tiles, size = 2048 … then $420B again</span>
+
+<span class="c">; -- the look of the screen -----------------------------------</span>
+  <span class="k">lda</span> <span class="n">#$01</span>
+  <span class="k">sta</span> <span class="n">$2105</span>       <span class="c">; BGMODE: mode 1 (BG1/BG2 4bpp, BG3 2bpp)</span>
+  <span class="k">lda</span> <span class="n">#$04</span>
+  <span class="k">sta</span> <span class="n">$2107</span>       <span class="c">; BG1SC: tilemap at word $0400, 32×32</span>
+  <span class="k">lda</span> <span class="n">#$01</span>
+  <span class="k">sta</span> <span class="n">$210B</span>       <span class="c">; BG12NBA: BG1 tiles at word $1000</span>
+  <span class="k">stz</span> <span class="n">$210D</span>
+  <span class="k">stz</span> <span class="n">$210D</span>       <span class="c">; BG1HOFS: scroll x = 0 (write twice: 2×8 bits)</span>
+  <span class="k">lda</span> <span class="n">#$11</span>
+  <span class="k">sta</span> <span class="n">$212C</span>       <span class="c">; TM: main screen = BG1 + sprites</span>
+  <span class="k">lda</span> <span class="n">#$0F</span>
+  <span class="k">sta</span> <span class="n">$2100</span>       <span class="c">; INIDISP: curtain up</span></pre>
+            <div class="cap">The full upload ritual. Every DMA is the same five settings — mode, target port, source, size, fire — pointed at a different destination.</div>
+          </div>
+
+          <p>
+            Read the DMA block as a sentence and it stops being arcane:
+            <em>&ldquo;channel 0, transfer pattern so-and-so, to B-bus port
+            such-and-such, from this address, this many bytes — go.&rdquo;</em>
+            The only genuinely SNES-flavoured details are that VRAM is
+            word-addressed through <code>$2116</code> with its port pair at
+            <code>$2118/9</code> (hence DMA mode 1, alternating two ports),
+            while CGRAM is a single byte-port at <code>$2122</code> (mode 0)
+            — and that none of it is legal while the PPU is drawing. That last
+            rule is the one beginners break: fire a VRAM DMA mid-frame with
+            the screen on and the write lands wherever the PPU's own address
+            counter happens to be, shredding tiles you uploaded correctly a
+            frame earlier. The lab lets you commit exactly that crime,
+            safely.
+          </p>
+
+          <div class="lab" id="lab-upload">
+            <div class="lab-head"><span class="dot"></span><span class="title">Upload sequencer — fire each write, watch the PPU's memories fill</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="up-grid">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">The sequence · click in any order (that's the point)</div>
+                  <div class="up-steps" data-up-steps></div>
+                  <div class="controls" style="margin-top:10px">
+                    <button class="play-btn" data-up-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Power-cycle</button>
+                  </div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">What the TV shows</div>
+                  <canvas class="tv" data-up-tv aria-label="Simulated TV output during the upload sequence"></canvas>
+                  <div style="margin-top:12px">
+                    <div class="bar-lbl"><span>CGRAM · 512 B</span><b data-up-cgpct>0%</b></div>
+                    <div class="fill-track"><div class="fl" data-up-cgbar></div></div>
+                  </div>
+                  <div style="margin-top:8px">
+                    <div class="bar-lbl"><span>VRAM · 64 KB</span><b data-up-vrpct>0%</b></div>
+                    <div class="fill-track"><div class="fl" data-up-vrbar></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="tc-narrate" data-up-narrate>Forced blank is on (we arrive from Module 05's init). Fire the steps — in order, or out of it — and read the consequences.</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The PPU draws only from VRAM/CGRAM; DMA channel 0 ($4300–$4306, fired by $420B) is how kilobytes get there fast.</li>
+              <li>VRAM: set <code>$2115/$2116</code>, stream to <code>$2118/9</code> in DMA mode 1. CGRAM: set <code>$2121</code>, stream to <code>$2122</code> in mode 0.</li>
+              <li>Mode 1, tilemap base, tile base, scroll, TM — five small writes define the whole look of the screen.</li>
+              <li>Upload under forced blank (or in vblank — Module 11); writes while the PPU draws land in the wrong place.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#gfx"><span class="dir">← Prev</span><span class="ttl">07 · Art into bytes</span></a>
+            <a class="next" href="#input"><span class="dir">Next →</span><span class="ttl">09 · Reading the player</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="input">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>Reading the player</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Switch on the auto-joypad reader, learn the $4218/9 bit layout by heart, and derive pressed / held / released with the one-XOR idiom.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A SNES pad is, electrically, a
+            <span class="term" data-tip="A chip that holds all button states at a latch pulse, then clocks them out one bit at a time over a serial line.">shift register</span>:
+            twelve buttons clocked out one bit at a time. You <em>could</em>
+            strobe and clock it manually — 6502 veterans do it from muscle
+            memory — but the 5A22 has a better offer: <strong>auto-joypad
+            read</strong>. Set bit 0 of <code>$4200</code>
+            (<span class="term" data-tip="NMITIMEN, $4200 — interrupt enable: bit 7 enables the vblank NMI, bit 0 enables the automatic joypad read at the start of every vblank.">NMITIMEN</span>)
+            and every vblank the hardware clocks all pads itself and parks the
+            results in registers. Since Bounce also wants the vblank interrupt
+            (Module 11), our boot code ends with one write that arms both:
+            <code>lda #$81 / sta $4200</code> — bit 7 NMI on, bit 0 auto-read
+            on.
+          </p>
+          <p>
+            Pad 1 lands in <code>$4218</code> (low byte) and <code>$4219</code>
+            (high byte). Read as one 16-bit word, the layout is worth
+            memorising — buttons from bit 15 down:
+            <strong>B&nbsp;Y&nbsp;Select&nbsp;Start&nbsp;↑&nbsp;↓&nbsp;←&nbsp;→&nbsp;A&nbsp;X&nbsp;L&nbsp;R</strong>,
+            then four low bits that identify the controller type
+            (<code>0000</code> for a standard pad). One timing courtesy: the
+            hardware takes the first few scanlines of vblank to finish
+            clocking, and it signals &ldquo;busy&rdquo; on bit 0 of
+            <code>$4212</code>
+            (<span class="term" data-tip="HVBJOY, $4212 — status bits: bit 7 = in vblank, bit 6 = in hblank, bit 0 = auto-joypad read still in progress.">HVBJOY</span>).
+            Read <code>$4218</code> while that bit is still set and you get a
+            half-shifted mess — a genuinely classic bug (it stars in Module
+            13). Wait for bit 0 to clear, then read.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 205" role="img" aria-label="The sixteen bits of JOY1 at $4218 and $4219, labelled">
+              <text x="40" y="30" class="d-tag">JOY1 — $4219 (high byte) : $4218 (low byte), read as one 16-bit word</text>
+              <g>
+                <rect x="40"  y="52" width="50" height="46" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="65"  y="72" text-anchor="middle" class="d-num">B</text><text x="65" y="88" text-anchor="middle" class="d-sub">15</text>
+                <rect x="94"  y="52" width="50" height="46" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="119" y="72" text-anchor="middle" class="d-num">Y</text><text x="119" y="88" text-anchor="middle" class="d-sub">14</text>
+                <rect x="148" y="52" width="50" height="46" rx="6" class="d-cell"/><text x="173" y="72" text-anchor="middle" class="d-num">Sel</text><text x="173" y="88" text-anchor="middle" class="d-sub">13</text>
+                <rect x="202" y="52" width="50" height="46" rx="6" class="d-cell"/><text x="227" y="72" text-anchor="middle" class="d-num">Sta</text><text x="227" y="88" text-anchor="middle" class="d-sub">12</text>
+                <rect x="256" y="52" width="50" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="281" y="72" text-anchor="middle" class="d-num">↑</text><text x="281" y="88" text-anchor="middle" class="d-sub">11</text>
+                <rect x="310" y="52" width="50" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="335" y="72" text-anchor="middle" class="d-num">↓</text><text x="335" y="88" text-anchor="middle" class="d-sub">10</text>
+                <rect x="364" y="52" width="50" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="389" y="72" text-anchor="middle" class="d-num">←</text><text x="389" y="88" text-anchor="middle" class="d-sub">9</text>
+                <rect x="418" y="52" width="50" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="443" y="72" text-anchor="middle" class="d-num">→</text><text x="443" y="88" text-anchor="middle" class="d-sub">8</text>
+                <rect x="472" y="52" width="50" height="46" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="497" y="72" text-anchor="middle" class="d-num">A</text><text x="497" y="88" text-anchor="middle" class="d-sub">7</text>
+                <rect x="526" y="52" width="50" height="46" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="551" y="72" text-anchor="middle" class="d-num">X</text><text x="551" y="88" text-anchor="middle" class="d-sub">6</text>
+                <rect x="580" y="52" width="50" height="46" rx="6" class="d-cell"/><text x="605" y="72" text-anchor="middle" class="d-num">L</text><text x="605" y="88" text-anchor="middle" class="d-sub">5</text>
+                <rect x="634" y="52" width="50" height="46" rx="6" class="d-cell"/><text x="659" y="72" text-anchor="middle" class="d-num">R</text><text x="659" y="88" text-anchor="middle" class="d-sub">4</text>
+                <rect x="688" y="52" width="172" height="46" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.2" stroke-dasharray="4 3"/><text x="774" y="72" text-anchor="middle" class="d-num">0 0 0 0</text><text x="774" y="88" text-anchor="middle" class="d-sub">3–0 · pad signature</text>
+              </g>
+              <text x="40" y="132" class="d-sub">high byte $4219 ——————————————— low byte $4218 ———————————</text>
+              <text x="40" y="168" class="d-sub d-cyan" style="fill:#45e4d1">face buttons</text>
+              <text x="180" y="168" class="d-sub" style="fill:#ffb14e">the D-pad — Bounce only reads bits 9 and 8</text>
+              <text x="40" y="190" class="d-sub">a held button reads 1 · everything is 0 while the auto-read is busy ($4212 bit 0)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Sixteen bits, memorised once, used forever.</strong> <code>$4219</code> holds B, Y, Select, Start and the D-pad; <code>$4218</code> holds A, X, L, R and the controller signature. Bounce cares about exactly two bits: ← (9) and → (8).</figcaption>
+          </figure>
+
+          <h4>Held is not pressed: the XOR idiom</h4>
+          <p>
+            Raw bits tell you a button is <em>down</em>. Games usually need
+            three finer questions — is it down (<strong>held</strong>: paddle
+            keeps moving), did it just go down this frame
+            (<strong>pressed</strong>: start the game, fire once), did it just
+            come up (<strong>released</strong>)? The idiom that answers all
+            three costs one XOR and two ANDs. Keep last frame's word; then
+            <code>changed = now EOR last</code> flags every bit that differs,
+            and masking picks the direction of the change:
+          </p>
+
+          <div class="code">
+<pre><span class="c">; once per frame, after $4212 bit 0 clears (16-bit A)</span>
+  <span class="k">lda</span> <span class="lb">joy_now</span>     <span class="c">; last frame's snapshot…</span>
+  <span class="k">sta</span> <span class="lb">joy_last</span>    <span class="c">; …becomes "last"</span>
+  <span class="k">lda</span> <span class="n">$4218</span>       <span class="c">; fresh 16-bit read: B Y Sel Sta ↑↓←→ A X L R ····</span>
+  <span class="k">sta</span> <span class="lb">joy_now</span>
+  <span class="k">eor</span> <span class="lb">joy_last</span>    <span class="c">; changed = now EOR last</span>
+  <span class="k">sta</span> <span class="lb">joy_chg</span>
+  <span class="k">and</span> <span class="lb">joy_now</span>     <span class="c">; changed AND now  → went down this frame</span>
+  <span class="k">sta</span> <span class="lb">joy_pressed</span>
+  <span class="k">lda</span> <span class="lb">joy_chg</span>
+  <span class="k">and</span> <span class="lb">joy_last</span>    <span class="c">; changed AND last → came up this frame</span>
+  <span class="k">sta</span> <span class="lb">joy_released</span></pre>
+            <div class="cap">Four direct-page words and five instructions buy every input question a game ever asks.</div>
+          </div>
+
+          <p>
+            The lab wires your keyboard (or the on-screen buttons) to a
+            simulated <code>$4218/9</code>. Watch bits light as you hold keys,
+            and watch <em>pressed</em> flash for exactly one frame while
+            <em>held</em> stays lit — then feel the difference drive a paddle.
+          </p>
+
+          <div class="lab" id="lab-joypad">
+            <div class="lab-head"><span class="dot"></span><span class="title">Joypad register lab — $4218/9, live from your keyboard</span><span class="badge">interactive · live</span></div>
+            <div class="lab-body">
+              <div class="joy-focus" data-joy-focus tabindex="0">Click here (or tab to it), then use <b>← → ↑ ↓</b>, <b>Z</b> (B), <b>X</b> (A), <b>Enter</b> (Start) — or hold the buttons below.</div>
+              <div class="joy-btns" data-joy-btns></div>
+              <div class="lab-sub" style="margin-top:4px">JOY1 · a held button reads 1</div>
+              <div class="joy-reg" data-joy-bits></div>
+              <div class="stat-row">
+                <div class="stat-chip">$4219 <b data-joy-h>$00</b></div>
+                <div class="stat-chip">$4218 <b data-joy-l>$00</b></div>
+                <div class="stat-chip ok">pressed <b data-joy-pr>—</b></div>
+                <div class="stat-chip">held <b data-joy-hd>—</b></div>
+                <div class="stat-chip warn">released <b data-joy-rl>—</b></div>
+              </div>
+              <canvas class="joy-strip" data-joy-strip aria-label="A paddle that moves while left or right is held"></canvas>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><code>$4200 = $81</code> arms the two per-frame services at once: the NMI (bit 7) and the auto-joypad read (bit 0).</li>
+              <li>Pad 1 is the 16-bit word at <code>$4218/9</code>: B Y Select Start ↑ ↓ ← → A X L R, plus a 4-bit controller signature.</li>
+              <li>Never read while <code>$4212</code> bit 0 is set — the shift is still in flight.</li>
+              <li><code>now EOR last</code>, masked with <code>now</code> or <code>last</code>, yields pressed and released; the raw word is held.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#upload"><span class="dir">← Prev</span><span class="ttl">08 · Uploading to the PPU</span></a>
+            <a class="next" href="#objects"><span class="dir">Next →</span><span class="ttl">10 · Sprites: the ball &amp; paddle</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="objects">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>Sprites: the ball &amp; paddle</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Give Bounce its moving parts: a shadow OAM buffer in WRAM, a two-sprite metasprite paddle, the 544-byte vblank DMA — and the high-table X bit that ambushes everyone.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Backgrounds don't move freely; <strong>sprites</strong> do. The
+            PPU keeps a private 544-byte table called
+            <span class="term" data-tip="Object Attribute Memory — the PPU's table of up to 128 sprites: 512 bytes of X, Y, tile and attributes (4 per sprite) plus a 32-byte high table holding each sprite's ninth X bit and size-select bit.">OAM</span>
+            describing up to 128 of them — for each: an X and Y position, a
+            tile number, and an attribute byte (palette, priority, flips) —
+            plus a 32-byte <strong>high table</strong> we'll get to, because it
+            gets everyone. The
+            <a href="../graphics/#obj">graphics course</a> covers how the PPU
+            evaluates all this per scanline; here we care about the
+            homebrewer's question: <em>how do you update it safely, every
+            frame?</em>
+          </p>
+          <p>
+            The answer is the pattern the whole platform runs on: you
+            <strong>never write OAM directly during gameplay</strong>. Instead
+            you keep a <strong>shadow OAM</strong> — a plain 544-byte buffer in
+            WRAM. Game logic writes the shadow whenever it likes, because WRAM
+            is always writable; then, once per frame inside vblank, one DMA
+            copies the whole shadow into the real OAM
+            (<code>$2102</code>&nbsp;←&nbsp;0, then 544 bytes to the
+            <code>$2104</code> data port). Two sprites can't tear apart
+            mid-frame, you never race the beam, and the cost is fixed: 544
+            bytes of your vblank budget (Module 11), every frame, forever.
+            Predictable beats clever.
+          </p>
+          <p>
+            Bounce's cast is three hardware sprites. The ball is one 8×8. The
+            paddle is 32 pixels wide — wider than our small sprite size — so
+            it's a <span class="term" data-tip="A game object drawn as several hardware sprites positioned together so they read as one thing. Big bosses on the SNES are often dozens of hardware sprites.">metasprite</span>:
+            two 16×16 sprites placed side by side, moved as one by code that
+            writes <code>paddle_x</code> and <code>paddle_x+16</code> into two
+            shadow entries. (The 8-vs-16 size choice per sprite comes from
+            OBSEL, <code>$2101</code>, plus that sprite's size bit.) This is
+            the pattern that scales: Mario is a metasprite; so is every boss
+            you've ever fought.
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Byte</th><th>Sprite 0 (ball) example</th><th>Meaning</th></tr></thead>
+              <tbody>
+                <tr><td><span class="crc">+0 · X</span></td><td><code>$7C</code></td><td>X position, <em>low 8 bits of 9</em> — the ninth lives in the high table</td></tr>
+                <tr><td><span class="crc">+1 · Y</span></td><td><code>$68</code></td><td>Y position; park a sprite at Y = $F0 to hide it off-screen</td></tr>
+                <tr><td><span class="crc">+2 · tile</span></td><td><code>$04</code></td><td>Which tile in the sprite character table draws this</td></tr>
+                <tr><td><span class="crc">+3 · attr</span></td><td><code>%00110000</code></td><td>vhoopppN: v/h flip, priority, palette 0–7, tile-page bit</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4>The high-table gotcha</h4>
+          <p>
+            Notice X is only 8 bits in the main table — but the screen is 256
+            wide and sprites must be able to slide <em>partially off the left
+            edge</em>, which needs X values like −8. So X is really a 9-bit
+            value, and bit 8 lives in the cramped <strong>high table</strong>:
+            32 bytes at the end of OAM, <em>two bits per sprite</em> — the
+            ninth X bit and the size-select bit, four sprites packed per byte.
+            Forget the ninth bit and a sprite meant to be at X&nbsp;=&nbsp;−4
+            (<code>$1FC</code>) appears at X&nbsp;=&nbsp;252 — teleporting
+            from the left edge to the right. Every SNES programmer has watched
+            that happen once. The lab below lets you drive the paddle off the
+            left edge and watch the bit do its job.
+          </p>
+
+          <div class="lab" id="lab-oam">
+            <div class="lab-head"><span class="dot"></span><span class="title">Shadow-OAM visualiser — WRAM updates now, OAM updates at vblank</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="oam-grid">
+                <div>
+                  <canvas class="oam-canvas" data-oam-canvas aria-label="Paddle and ball drawn from the PPU's copy of OAM"></canvas>
+                  <div class="pad-btns" style="max-width:280px">
+                    <button class="pad-btn" data-oam-left aria-label="Move paddle left">◀</button>
+                    <button class="pad-btn" data-oam-right aria-label="Move paddle right">▶</button>
+                  </div>
+                  <div class="oam-tick" data-oam-tick style="margin-top:10px"><span class="lamp"></span><span>next OAM DMA in <b data-oam-cd>—</b></span></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Shadow OAM (WRAM) → OAM (PPU)</div>
+                  <div class="oam-tbl" data-oam-tbl></div>
+                  <div class="tc-narrate" data-oam-narrate style="min-height:52px">Hold ◀ — the shadow bytes (cyan) change <b>instantly</b>; the screen and the PPU column only change when the DMA tick copies all 544 bytes.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>OAM: 128 sprites × 4 bytes, plus the 32-byte high table — 544 bytes total, DMA'd from a WRAM shadow every vblank.</li>
+              <li>Game logic writes the shadow at any time; only the vblank DMA touches the real OAM. Predictable beats clever.</li>
+              <li>Wide objects are metasprites — Bounce's paddle is two 16×16 sprites moved as one.</li>
+              <li>X is 9 bits; the ninth lives in the high table. Forget it and sprites teleport across the screen at the left edge.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#input"><span class="dir">← Prev</span><span class="ttl">09 · Reading the player</span></a>
+            <a class="next" href="#gameloop"><span class="dir">Next →</span><span class="ttl">11 · The game loop</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="gameloop">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>The game loop</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Lock Bounce to the frame: logic during the picture, PPU writes only in vblank, an NMI heartbeat — and 8.8 fixed-point physics for motion smoother than whole pixels.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Everything so far was setup. A <em>game</em> is a loop, and on the
+            SNES the loop is welded to the television. Each frame the beam
+            draws lines 0–224, then rests through lines 225–261 — the
+            <span class="term" data-tip="Vertical blanking: the slice of each frame (lines 225–261 on NTSC) when the beam has finished the picture and the PPU's memories are safe to write.">vblank</span>
+            — and at the instant vblank begins the console fires the
+            <span class="term" data-tip="Non-Maskable Interrupt — the once-per-frame interrupt raised at the start of vblank (when enabled via $4200 bit 7). Its handler address lives at the $FFEA vector.">NMI</span>
+            through your <code>$FFEA</code> vector
+            (<a href="../cpu/#interrupts">interrupts</a>, if the word is new).
+            That gives the frame a contract, and it's the most important
+            paragraph in this course: <strong>game logic runs during the
+            picture; PPU writes happen only in vblank.</strong> Logic — input,
+            physics, collisions — touches only WRAM and the shadow buffers,
+            so it's safe while the beam draws. The NMI handler then spends the
+            blank window doing the actual uploads: DMA the shadow OAM, poke
+            the two scroll registers, update the score tiles.
+          </p>
+
+          <div class="code">
+<pre><span class="lb">nmi_handler:</span>              <span class="c">; runs at the top of every vblank</span>
+  <span class="k">jsr</span> <span class="lb">oam_dma</span>            <span class="c">; 544 bytes, shadow → OAM</span>
+  <span class="k">jsr</span> <span class="lb">score_tiles</span>        <span class="c">; a few words into the tilemap</span>
+<span class="lb">wait_pad:</span>
+  <span class="k">lda</span> <span class="n">$4212</span>
+  <span class="k">and</span> <span class="n">#$01</span>
+  <span class="k">bne</span> <span class="lb">wait_pad</span>           <span class="c">; auto-joypad still shifting? wait</span>
+  <span class="k">jsr</span> <span class="lb">read_pad</span>            <span class="c">; the Module 09 idiom</span>
+  <span class="k">lda</span> <span class="n">#$01</span>
+  <span class="k">sta</span> <span class="lb">frame_ready</span>         <span class="c">; tell main: a new frame has begun</span>
+  <span class="k">rti</span>
+
+<span class="lb">main_loop:</span>                <span class="c">; runs during the visible picture</span>
+  <span class="k">jsr</span> <span class="lb">move_paddle</span>         <span class="c">; WRAM + shadow OAM only — never $21xx!</span>
+  <span class="k">jsr</span> <span class="lb">move_ball</span>
+  <span class="k">jsr</span> <span class="lb">collide</span>
+<span class="lb">frame_wait:</span>
+  <span class="k">wai</span>                    <span class="c">; sleep until an interrupt…</span>
+  <span class="k">lda</span> <span class="lb">frame_ready</span>
+  <span class="k">beq</span> <span class="lb">frame_wait</span>         <span class="c">; …and confirm it was the NMI</span>
+  <span class="k">stz</span> <span class="lb">frame_ready</span>
+  <span class="k">bra</span> <span class="lb">main_loop</span></pre>
+            <div class="cap">The frame contract in code: NMI uploads and flags; main computes and waits. Sixty times a second, forever.</div>
+          </div>
+
+          <p>
+            Vblank is short, so it has a <strong>byte budget</strong>: at DMA
+            speed (roughly a byte per eight master cycles —
+            <a href="../cpu/#dma">the CPU course puts numbers on it</a>) the
+            ~37 blank lines move about <strong>6&nbsp;KB</strong>, minus
+            whatever your handler spends on housekeeping. Bounce's frame bill
+            is trivial — 544 bytes of OAM and a handful of tilemap words —
+            but the discipline matters because both budgets fail the same
+            way: if logic takes longer than a frame, or uploads outgrow
+            vblank, you <strong>drop a frame</strong> — the NMI arrives while
+            you're still working, the new picture isn't ready, and motion
+            visibly hitches. Big games spend careers negotiating these two
+            budgets; the lab below lets you bankrupt both with two sliders.
+          </p>
+
+          <h4>Subpixels: the 8.8 fixed-point primer</h4>
+          <p>
+            One more tool and Bounce's physics is done. Screen positions are
+            whole pixels, but a ball moving &ldquo;1 pixel per frame&rdquo; or
+            &ldquo;2&rdquo; only knows two speeds — arcade feel needs
+            <em>1.4</em>. The 65816 has no floating point, and doesn't need
+            it: use <strong>8.8 fixed point</strong>. Keep positions and
+            velocities as 16-bit words and simply <em>declare</em> that the
+            high byte is whole pixels and the low byte is 256ths of a pixel.
+            Addition just works — <code>lda ball_x / clc / adc ball_vx / sta
+            ball_x</code> is the entire physics engine — and when drawing you
+            take the high byte (<code>ball_x+1</code>) as the pixel position.
+          </p>
+
+          <div class="example">
+            <span class="lbl">Worked example · a ball moving 1.5 px/frame</span>
+            <p>
+              Position starts at pixel 40: <code>ball_x = $2800</code>
+              ($28 = 40 whole, $00 low byte). Velocity 1.5 px/frame:
+              <code>ball_vx = $0180</code> (1 whole + $80/256 = .5).
+              Frame 1: $2800 + $0180 = <code>$2980</code> → draw at pixel $29 = 41.
+              Frame 2: → <code>$2B00</code> → pixel 43.
+              Frame 3: → <code>$2C80</code> → pixel 44 — over three frames the
+              ball moved 4½ pixels, drawn as 1, 2, 1… The eye reads it as
+              perfectly smooth 1.5. Speeding up after each rally hit is one
+              instruction: add a little to <code>ball_vx</code>.
+            </p>
+          </div>
+
+          <div class="lab" id="lab-budget">
+            <div class="lab-head"><span class="dot"></span><span class="title">Frame-budget visualiser — overspend either budget, drop frames</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <canvas class="budget-canvas" data-bud-canvas aria-label="Frame timeline showing logic time and vblank uploads"></canvas>
+              <div class="controls">
+                <div class="ctrl" style="flex:1;min-width:200px">
+                  <label>Game-logic cost · <span class="val" data-bud-logic-val>60% of a frame</span></label>
+                  <input type="range" min="10" max="250" value="60" data-bud-logic>
+                </div>
+                <div class="ctrl" style="flex:1;min-width:200px">
+                  <label>Vblank upload · <span class="val" data-bud-bytes-val>2,000 bytes</span></label>
+                  <input type="range" min="0" max="12000" step="100" value="2000" data-bud-bytes>
+                </div>
+              </div>
+              <div class="stat-row">
+                <div class="stat-chip">Effective rate <b data-bud-fps>60 fps</b></div>
+                <div class="stat-chip">Vblank budget used <b data-bud-used>33%</b></div>
+                <div class="stat-chip warn" data-bud-warn style="display:none">Status <b>—</b></div>
+              </div>
+              <div class="tc-narrate" data-bud-narrate>Both budgets healthy: logic fits inside one frame, uploads fit inside vblank. This is a locked 60 fps.</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The frame contract: logic during the picture (WRAM and shadows only), PPU writes only in vblank. Break it and Module 13 has a card with your name on it.</li>
+              <li>The NMI is the heartbeat: DMA the shadow OAM, update tiles, wait out <code>$4212</code> bit 0, read the pad, set a flag; main waits with <code>wai</code>.</li>
+              <li>Vblank moves ~6 KB by DMA; logic gets one frame. Overspend either and frames drop — a hitch you can see.</li>
+              <li>8.8 fixed point: high byte pixels, low byte 256ths. One <code>adc</code> is a physics engine; <code>ball_x+1</code> is the pixel.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#objects"><span class="dir">← Prev</span><span class="ttl">10 · Sprites: the ball &amp; paddle</span></a>
+            <a class="next" href="#sound"><span class="dir">Next →</span><span class="ttl">12 · Sound, the honest version</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="sound">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Sound, the honest version</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Get a bounce blip and a music loop into the game the way real homebrewers do: adopt a proven driver, upload it to the sound CPU, and send it commands.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Time for some honesty that will save you a month. The SNES's audio
+            side is a <em>separate computer</em> — an SPC700 CPU with its own
+            64&nbsp;KB of RAM driving the S-DSP, connected to your world by
+            exactly four little mailbox ports at <code>$2140–$2143</code>
+            (the <a href="../audio/#ssmp">audio course</a> tours the whole
+            apparatus). To make any sound at all, that computer needs a
+            program — a <span class="term" data-tip="The program running on the SPC700 that owns all audio: it parses music data, schedules notes, configures S-DSP voices, and listens on the I/O ports for commands from the main CPU.">sound driver</span>
+            — and writing a good one is a project the size of this entire
+            course. <strong>You do not hand-roll an SPC700 driver on day
+            one.</strong> Nobody does; even commercial games mostly shipped
+            Nintendo's stock N-SPC driver. You adopt one:
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Driver</th><th>What it is</th><th>Why pick it</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">Terrific Audio Driver</span></td><td>A modern, actively maintained homebrew driver with its own tooling and ca65 bindings</td><td>The current community default — music, sound effects, documented main-CPU API</td></tr>
+                <tr><td><span class="pill axwii">SNESGSS</span></td><td>A tracker plus matching driver: compose in the GUI, export data and player together</td><td>Everything in one tool; well-trodden by jam games</td></tr>
+                <tr><td><span class="pill util">N-SPC-style drivers</span></td><td>Community reimplementations patterned on Nintendo's stock engine</td><td>Familiar format for musicians coming from the ROM-hacking world</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            Whichever you pick, your game's job shrinks to two phases.
+            <strong>Phase one, at boot: upload the driver.</strong> The SPC700
+            wakes running a tiny built-in loader (the IPL ROM) that announces
+            itself by putting <code>$AA</code> and <code>$BB</code> on the
+            ports. Your code performs the documented handshake over
+            <code>$2140–3</code> — send a byte, wait for the echo, repeat —
+            streaming the driver program and every sound sample into that
+            64&nbsp;KB of audio RAM, then telling it where to start. Every
+            driver ships this upload routine; you call it once and watch the
+            handshake tick in the debugger. (Samples are stored in the SNES's
+            compressed <a href="../audio/#brr">BRR format</a> — your driver's
+            tools convert WAVs for you.)
+          </p>
+          <p>
+            <strong>Phase two, forever after: send commands.</strong> From the
+            main CPU's point of view the entire sound system is now &ldquo;write
+            a command byte and a parameter to the mailbox, move on&rdquo; —
+            fire-and-forget, a few dozen cycles inside your NMI handler.
+            Bounce needs precisely two commands: <em>play the blip</em> (on
+            paddle contact, pitched up a touch as the rally grows) and
+            <em>start the loop</em> (once, at title). The lab below is that
+            command stream made visible — a 16-step grid where each cell is a
+            mailbox write. A Web-Audio square and triangle stand in for the
+            S-DSP, and we label them as the stand-ins they are; the byte pairs
+            underneath are the real interface.
+          </p>
+
+          <div class="lab" id="lab-sfx">
+            <div class="lab-head"><span class="dot"></span><span class="title">Driver-command sequencer — mailbox bytes on a 16-step grid</span><span class="badge">web-audio stand-in</span></div>
+            <div class="lab-body">
+              <div class="seq" data-seq-grid></div>
+              <div class="controls">
+                <button class="play-btn" data-seq-play>Play</button>
+                <div class="ctrl">
+                  <label>Tempo · <span class="val" data-seq-bpm-val>112 bpm</span></label>
+                  <input type="range" min="70" max="160" value="112" data-seq-bpm>
+                </div>
+                <span style="font-size:12px;color:var(--muted)">a Web-Audio square &amp; triangle stand in for the S-DSP — the bytes below are what your NMI would really write</span>
+              </div>
+              <div class="seq-log" data-seq-log>press Play — each firing step logs its two port writes</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Audio is a second computer; only a driver program running on it makes sound. Adopt one — Terrific Audio Driver, SNESGSS, or an N-SPC-style engine.</li>
+              <li>&ldquo;Uploading a driver&rdquo; = the IPL-ROM handshake over <code>$2140–3</code>: stream code and BRR samples into audio RAM, then jump.</li>
+              <li>After boot, sound is fire-and-forget: command bytes into the mailbox from your NMI handler.</li>
+              <li>Bounce ships with two commands — a pitch-rising blip and one music loop. That's a complete, honest sound design.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#gameloop"><span class="dir">← Prev</span><span class="ttl">11 · The game loop</span></a>
+            <a class="next" href="#debug"><span class="dir">Next →</span><span class="ttl">13 · Debugging &amp; the accuracy gauntlet</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Shipping it</h3>
+          <p>
+            A game that runs on your emulator is a prototype. A game that runs
+            on a console you can't debug, from a flash cart, on a stranger's
+            television, is a release. This last part is the gap between the
+            two: the five classic homebrew bugs and their visible symptoms,
+            the Mesen2-and-bsnes gauntlet that catches them, and then the
+            good part — flash carts, the checksum, the compo, and the moment
+            you hand your cartridge to someone else.
+          </p>
+          <div class="part-meta"><span>Modules <b>13–14</b></span><span>Difficulty <b>Hands-on</b></span><span>Labs <b>2 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="debug">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Debugging &amp; the accuracy gauntlet</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn the classic homebrew bugs by their symptoms — most are visible from across the room — and the emulator settings that catch them before hardware does.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            SNES bugs are unusually photogenic. Because so much of the machine
+            is timing and memory discipline, each classic mistake produces a
+            <em>recognisable picture</em> — experienced homebrewers diagnose
+            from screenshots the way mechanics diagnose from engine sounds.
+            The big five, which between them cover most of every beginner's
+            first month:
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+              <tbody>
+                <tr><td>Flickering / torn tiles during play</td><td>PPU writes outside vblank — the Module 11 contract, broken</td><td>Move every <code>$21xx</code> write into the NMI handler; check the event viewer</td></tr>
+                <tr><td>Garbage everywhere from power-on</td><td>Init skipped forced blank or the VRAM/CGRAM/OAM clears</td><td>Run the full Module 05 checklist, in order, every boot</td></tr>
+                <tr><td>Works in emulator, dies on hardware</td><td>Uninitialised WRAM or registers — emulators zero what silicon leaves as noise</td><td>Clear WRAM at boot; never branch on a variable before writing it</td></tr>
+                <tr><td>Inputs ghost, stick, or fire on their own</td><td>Reading <code>$4218/9</code> while <code>$4212</code> bit 0 says the auto-read is busy</td><td>Wait out the busy bit — three instructions (Module 11's handler)</td></tr>
+                <tr><td>&ldquo;Random&rdquo; behaviour that differs per emulator</td><td>Reading unmapped addresses — <span class="term" data-tip="Reading an address nothing answers returns whatever data byte last crossed the bus — a leftover, not a value. Emulators model it differently, so code that relies on it behaves differently everywhere.">open bus</span> — and treating the leftovers as data</td><td>Take randomness from a real seed (frame counter + player input), never from the bus</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The third row deserves its own paragraph, because it's the one
+            that breaks hearts at the compo deadline. An emulator that starts
+            all RAM at zero <em>silently forgives</em> every read-before-write
+            bug: your flag &ldquo;happens&rdquo; to be clear, your pointer
+            &ldquo;happens&rdquo; to be null, and the game runs perfectly for
+            months — until real silicon wakes with that byte as <code>$B7</code>
+            and the title screen never comes. This is why the gauntlet is
+            <strong>two emulators, deliberately configured</strong>. Develop
+            in <strong>Mesen2</strong> with its lifesaver switched on —
+            <em>break on uninitialised read</em>, which pauses the instant any
+            code reads a byte nothing ever wrote, plus the option to randomise
+            RAM at power-on so &ldquo;lucky zeroes&rdquo; stop existing. Then
+            verify in <strong>bsnes</strong>, the accuracy reference, which
+            models timing tightly enough that vblank-budget sins and
+            beam-racing tricks fail there the way they'd fail on the console.
+            Clean in both, with randomised RAM, is as close to
+            &ldquo;hardware-proof&rdquo; as software testing gets.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The doctor's picture cards</span>
+            <p>
+              Medical students learn rashes from photo cards long before they
+              meet patients, because the fastest diagnosis is recognition, not
+              deduction. The lab below is your card deck: five broken TVs,
+              five causes. Get them into your visual memory now and your
+              future self stares at a glitched screen for five seconds instead
+              of five hours.
+            </p>
+          </div>
+
+          <div class="lab" id="lab-bugs">
+            <div class="lab-head"><span class="dot"></span><span class="title">Spot the bug — five symptoms, pick each cause</span><span class="badge">interactive</span></div>
+            <div class="lab-body">
+              <div class="stat-row"><div class="stat-chip">Diagnosed <b data-bug-score>0 / 5</b></div></div>
+              <div class="bug-cards" data-bug-cards></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The classic bugs announce themselves visually: tearing = writes outside vblank; boot garbage = skipped init; ghost inputs = ignored <code>$4212</code> busy bit.</li>
+              <li>&ldquo;Works in the emulator&rdquo; means nothing until RAM is randomised — silicon doesn't hand out zeroes.</li>
+              <li>Mesen2's break-on-uninitialised-read catches read-before-write bugs the day you write them, not at the deadline.</li>
+              <li>The gauntlet is both emulators: Mesen2 to find bugs, bsnes to prove timing. Clean in both before hardware.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sound"><span class="dir">← Prev</span><span class="ttl">12 · Sound, the honest version</span></a>
+            <a class="next" href="#release"><span class="dir">Next →</span><span class="ttl">14 · Real hardware &amp; release</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="release">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
+          <h3>Real hardware &amp; release</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Put Bounce on a real console via a flash cart, run the release checklist, and send it into the world — legally, findably, and finished.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Nothing about this hobby beats the first time your code comes out
+            of a real console into a real television. The bridge is a
+            <span class="term" data-tip="A cartridge with rewritable storage and a menu: copy .sfc files onto its SD card, slot it into a real console, pick your game. The homebrew equivalent of burning your own cartridge ROM.">flash cart</span>:
+            the <strong>FXPak Pro</strong> is the scene's favourite (an FPGA
+            cart that even recreates the <a href="../cart/#chips">enhancement
+            chips</a>), with the <strong>Super EverDrive</strong> as the
+            budget classic — for a plain <a href="../cart/#maps">LoROM</a>
+            game like Bounce, either is perfect. Copy the <code>.sfc</code>
+            onto the SD card, slot it, play. Do try a
+            <span class="term" data-tip="Cathode-ray tube — the display technology of the console's era. Zero processing delay and scanline rendering; the look and feel the games were designed against.">CRT</span>
+            if you can — zero lag and honest scanlines — but test on a modern
+            TV too, because that's where most players will meet your game,
+            added latency, upscaler quirks and all.
+          </p>
+          <p>
+            Before the file goes anywhere, three mechanical rites. Fix the
+            <strong>checksum</strong> — recompute the Module 06 pair over the
+            final padded ROM (your build script's last step; flash-cart menus
+            and emulators both check it). Pad the ROM to a clean
+            <strong>power-of-two</strong> size. And ship a bare
+            <code>.sfc</code> — <em>no copier header</em>, the obsolete
+            512-byte block that 1990s disk-copier hardware prepended; modern
+            tools treat it as corruption. Then release where the scene
+            actually lives: an <strong>itch.io</strong> page (free or paid —
+            it's your game), a thread on the <strong>SNESdev forums</strong>
+            at <a href="https://snes.nesdev.org/">snes.nesdev.org</a> and its
+            Discord, and — if you time it right — the annual
+            <strong>SNESdev Compo</strong>, where new games premiere every
+            year. Boutique publishers do press homebrew onto real boxed
+            cartridges; finish something people love and that conversation
+            can find you. The legal recap from Module 01, compressed to one
+            line: <em>your code, your art, your sound, your title — and
+            nobody's trademarks.</em>
+          </p>
+
+          <div class="lab" id="lab-ship">
+            <div class="lab-head"><span class="dot"></span><span class="title">Release checklist — stamp the cart</span><span class="badge">interactive</span></div>
+            <div class="lab-body">
+              <div class="ship-grid">
+                <div class="ship-list" data-ship-list></div>
+                <div>
+                  <canvas class="cart-canvas" data-ship-cart aria-label="Your cartridge, awaiting the shipped stamp"></canvas>
+                  <div class="stamp-wrap"><span class="stamp" data-ship-stamp>SHIPPED</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h4>One last look at Bounce</h4>
+          <p>
+            Here's the capstone again — the same game you played in Module 01.
+            But you're a different reader now, so this copy is annotated:
+            switch on the overlay and every part of the screen names the
+            module that built it. That border is a tilemap you can convert
+            with superfamiconv; that paddle is two shadow-OAM entries riding a
+            vblank DMA; that motion is an <code>adc</code> on an 8.8 word.
+            Nothing on this screen is magic anymore. That was the whole plan.
+          </p>
+
+          <div class="lab" id="lab-ship-game">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bounce, annotated — every piece labelled with the module that built it</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="bounce-stage">
+                <div>
+                  <canvas class="bounce-canvas" data-bounce-canvas tabindex="0" aria-label="Bounce with annotation overlay. Focus and use left and right arrow keys to move the paddle."></canvas>
+                  <div class="pad-btns">
+                    <button class="pad-btn" data-bounce-left aria-label="Move paddle left">◀</button>
+                    <button class="pad-btn" data-bounce-right aria-label="Move paddle right">▶</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="anno-toggle" style="margin-bottom:10px"><input type="checkbox" data-bounce-anno checked> Show which module built each piece</label>
+                  <div class="stat-row" style="flex-direction:column;align-items:stretch">
+                    <div class="stat-chip">Score <b data-bounce-score>0</b></div>
+                    <div class="stat-chip">Best rally <b data-bounce-best>0</b></div>
+                    <div class="stat-chip">Balls left <b data-bounce-lives>3</b></div>
+                  </div>
+                  <div class="controls" style="margin-top:12px">
+                    <button class="play-btn" data-bounce-start>Start</button>
+                    <button class="play-btn" data-bounce-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Reset</button>
+                  </div>
+                  <div class="tc-narrate" data-bounce-msg style="margin-top:12px">Same game, new eyes. Toggle the overlay and read the screen as a bill of materials.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h4>Where to go next</h4>
+          <p>
+            Bounce is small on purpose — a scaffold, not a ceiling. When your
+            next game wants parallax, colour math or Mode 7, the
+            <a href="../graphics/">graphics course</a> is waiting; when it
+            wants real music and echo, the <a href="../audio/">audio
+            course</a>; when it outgrows 32&nbsp;KB banks or wants a
+            battery save or a co-processor, the
+            <a href="../cart/">cartridge course</a>; and when you need to
+            <em>reason</em> about cycles instead of guessing, the
+            <a href="../cpu/">CPU course</a>. For everything this collection
+            doesn't cover, the community's reference wiki at
+            <a href="https://snes.nesdev.org/">snes.nesdev.org</a> is the
+            standard library, and the forums behind it are where working
+            homebrewers answer questions. You have a toolchain, a working
+            game, and a map of the machine. The compo runs every year.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can take a SNES game from empty file to real hardware: init, header, art, upload, input, sprites, loop, sound, debug, ship.</li>
+              <li>Flash carts (FXPak Pro, Super EverDrive) make your console the last debugger; checksum fixed, power-of-two padded, no copier header.</li>
+              <li>Release where the scene lives: itch.io, the SNESdev forums and Discord, the annual compo — with everything in the file yours.</li>
+              <li>Now go build something weirder than Bounce.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#debug"><span class="dir">← Prev</span><span class="ttl">13 · Debugging &amp; the accuracy gauntlet</span></a>
+            <a class="next" href="#homebrew"><span class="dir">↺ Restart</span><span class="ttl">01 · What homebrew is</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course in the &ldquo;Inside the Super Nintendo&rdquo;
+          collection. Every lab on this page is a from-scratch simulation
+          written for teaching — the Bounce game is a browser recreation, not
+          an emulated ROM, and no Nintendo code or assets appear anywhere.
+          Register addresses and formats are grounded in the community's
+          public documentation at snes.nesdev.org; tools named (ca65, WLA-DX,
+          asar, PVSnesLib, libSFX, superfamiconv, YY-CHR, Mesen2, bsnes,
+          Terrific Audio Driver, SNESGSS) are real and free.
+        </p>
+        <p class="src">
+          Homebrew register kit · <code>$2100 INIDISP</code> ·
+          <code>$2116–$2119 VRAM</code> · <code>$2121/22 CGRAM</code> ·
+          <code>$2140–$2143 APU</code> · <code>$4200 NMITIMEN</code> ·
+          <code>$4212 HVBJOY</code> · <code>$4218/9 JOY1</code> ·
+          <code>$4300–$4306 + $420B DMA</code> · header <code>$FFC0</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>

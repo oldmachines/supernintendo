@@ -15,13 +15,17 @@ no framework, no tracking. Open it in a browser and it runs.
 | **Graphics & the PPU** | ✅ Ready — 16-module interactive course | [`graphics/`](graphics/) |
 | **CPU & the 65816** | ✅ Ready — 15-module interactive course | [`cpu/`](cpu/) |
 | **The Game Pak** | ✅ Ready — 13-module interactive course | [`cart/`](cart/) |
+| **Build your own game** | ✅ Ready — 14-module homebrew course | [`homebrew/`](homebrew/) |
 
-Every course follows the same arc: **Part I** teaches the field's fundamentals
-from absolute zero, **Part II** tears down the Super Nintendo's take on it, and
-**Part III** shows how the [bsnes](https://github.com/bsnes-emu/bsnes) /
-[higan](https://github.com/higan-emu/higan) emulators reproduce it. Each module
-ships **interactive labs** — everything is drawn and synthesised live in the
-browser; no game assets are included.
+The four subsystem courses follow the same arc: **Part I** teaches the field's
+fundamentals from absolute zero, **Part II** tears down the Super Nintendo's
+take on it, and **Part III** shows how the
+[bsnes](https://github.com/bsnes-emu/bsnes) /
+[higan](https://github.com/higan-emu/higan) emulators reproduce it. The
+homebrew course flips the arc to *making*: the toolkit, then building a
+complete little game step by step, then shipping it to real hardware. Each
+module ships **interactive labs** — everything is drawn and synthesised live in
+the browser; no game assets are included.
 
 ### Audio & the S-DSP
 
@@ -54,6 +58,19 @@ the DMA and HDMA controllers, and the hardware multiply/divide registers — and
 finally how bsnes interprets the processor cycle by cycle. Labs include a
 steppable toy CPU, a register-width flipper, an addressing-mode explorer and a
 DMA/HDMA timeline.
+
+### Build your own game
+
+SNES homebrew from zero: the real modern toolchain (ca65/WLA-DX assemblers,
+PVSnesLib for C, Mesen2 as the dev emulator), just enough 65816, then a
+complete little game — "Bounce" — built module by module: boot/init code, the
+ROM header, converting art to 4bpp tiles and 15-bit palettes, DMA uploads,
+auto-joypad input, shadow-OAM sprites, the NMI game loop with fixed-point
+physics, and sound via a real community driver. Part III covers debugging the
+classic homebrew bugs, testing on real hardware with flash carts, and
+releasing your ROM. Labs include a steppable assembly playground, an
+init-sequence simulator, a pixel-art-to-bytes converter and the finished game
+playable in the browser.
 
 ### The Game Pak
 
