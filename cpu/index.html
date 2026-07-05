@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Super NES CPU — a course on the 65816 &amp; the Ricoh 5A22</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%237d5cf0%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%276%27 fill=%27none%27 stroke=%27%230c0a13%27 stroke-width=%273%27/%3E%3C/svg%3E">
-<meta name="description" content="A hands-on course in three parts: how a CPU works from absolute zero, what makes the Super Nintendo's Ricoh 5A22 — a 65816 core plus Nintendo's on-die DMA, HDMA and math hardware — tick, and how bsnes emulates it cycle-for-cycle. Every module has an interactive lab you can run in your browser.">
+<meta name="description" content="A hands-on course in three parts: how a CPU works from absolute zero, what makes the Super Nintendo's Ricoh 5A22 — a 65816 core plus Nintendo's on-die DMA, HDMA and math hardware — tick, and how bsnes emulates it cycle-for-cycle. Ten interactive labs across fifteen modules, all running in your browser.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -69,9 +69,9 @@
             a 16-bit <strong>65816</strong> core wrapped in Nintendo's own DMA,
             HDMA and math hardware. We finish inside <strong>bsnes</strong>,
             where a single master clock keeps the whole console honest. Fifteen
-            modules, each with a <strong>live, clickable machine</strong> so you
-            can watch every idea run, not just read about it. No game code ships
-            with this page; every simulation is built in your browser.
+            modules, with <strong>ten live, clickable machines</strong> along the
+            way so you can watch every idea run, not just read about it. No game
+            code ships with this page; every simulation is built in your browser.
           </p>
           <div class="cta-row">
             <a class="btn primary" href="#loop">
@@ -143,7 +143,10 @@
             number stands for — and <strong>execute</strong> it. Then do the
             next one. That's the whole job. Everything a Super Nintendo ever did
             — every Mode 7 castle, every Chrono Trigger battle, every pixel —
-            is that loop, running fast.
+            is that loop, running fast. What sets the relentless pace is a
+            <strong>clock</strong> — a steady electrical pulse, a metronome
+            inside the chip; each tick lets the machine take its next tiny
+            step. Module 06 puts real numbers on it.
           </p>
           <p>
             Two words in that ritual need unpacking. <strong>Memory</strong> is
@@ -153,8 +156,10 @@
             <strong>address</strong> — cell 0, cell 1, cell 2, and so on. And an
             <strong>instruction</strong> is just one of those stored numbers
             that the CPU has agreed to treat as a command. There is nothing
-            special about the number itself: <code>$A9</code> sitting in memory
-            might mean &ldquo;load the accumulator&rdquo; to the processor, or it
+            special about the number itself: <code>$A9</code> (the <code>$</code>
+            just marks a number written in hexadecimal, base 16 — Module 03
+            unpacks that notation) sitting in memory might mean &ldquo;load the
+            accumulator&rdquo; to the processor, or it
             might just be the number 169 in someone's data. Position and
             convention decide, nothing else. Programs and data live in the same
             memory, side by side — this is the single most important idea in
@@ -308,7 +313,13 @@
             arithmetic circuitry. It holds one value and reading or writing it
             costs almost nothing. Registers are the workbench; memory is the
             warehouse. There are only a handful precisely <em>because</em>
-            they're so close — you can't fit a warehouse on a workbench.
+            they're so close — you can't fit a warehouse on a workbench. And the
+            difference is measurable in clock ticks: an instruction that works
+            purely with registers (like <code>INX</code>, add 1 to X) takes the
+            65816 about 2 cycles, while one that must fetch its operand from
+            memory (like <code>ADC $2000</code>) takes 4 or more. Multiply that
+            gap by millions of instructions a second and you see why compilers
+            and programmers fight to keep hot values in registers.
           </p>
 
           <div class="analogy">
@@ -362,6 +373,88 @@
             <strong>M</strong> sets the accumulator's width and <strong>X</strong>
             sets the index registers' width — 8 or 16 bits — which is Module 08's
             headline story.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 400" role="img" aria-label="The 65816 programmer's model: every register drawn to its true width, with the P flag cells and the hidden E bit">
+              <defs><marker id="fg2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="40" y="34" class="d-tag">The 65816 programmer's model — boxes drawn to width (16-bit = full, 8-bit = half)</text>
+
+              <!-- A over B -->
+              <text x="40" y="66" class="d-sub">accumulator · M flag splits it (Module 08)</text>
+              <rect x="40" y="74" width="150" height="40" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.3" stroke-dasharray="5 4"/>
+              <text x="115" y="93" text-anchor="middle" class="d-num">B</text>
+              <text x="115" y="107" text-anchor="middle" class="d-sub">hidden high byte</text>
+              <rect x="190" y="74" width="150" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="265" y="93" text-anchor="middle" class="d-num">A</text>
+              <text x="265" y="107" text-anchor="middle" class="d-sub">8-bit A · 16-bit = B:A</text>
+
+              <!-- X -->
+              <text x="40" y="146" class="d-sub">index registers · X flag truncates them</text>
+              <rect x="40" y="154" width="150" height="40" rx="6" class="d-cell-x" stroke-dasharray="5 4"/>
+              <text x="115" y="173" text-anchor="middle" class="d-num">X hi</text>
+              <text x="115" y="187" text-anchor="middle" class="d-sub">forced $00 when X=1</text>
+              <rect x="190" y="154" width="150" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="265" y="178" text-anchor="middle" class="d-num">X lo</text>
+
+              <!-- Y -->
+              <rect x="40" y="202" width="150" height="40" rx="6" class="d-cell-x" stroke-dasharray="5 4"/>
+              <text x="115" y="221" text-anchor="middle" class="d-num">Y hi</text>
+              <text x="115" y="235" text-anchor="middle" class="d-sub">forced $00 when X=1</text>
+              <rect x="190" y="202" width="150" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="265" y="226" text-anchor="middle" class="d-num">Y lo</text>
+
+              <!-- P flags -->
+              <text x="40" y="286" class="d-sub">status register P · eight 1-bit flags</text>
+              <rect x="40"  y="294" width="36" height="36" rx="5" class="d-cell"/><text x="58"  y="317" text-anchor="middle" class="d-num">N</text>
+              <rect x="78"  y="294" width="36" height="36" rx="5" class="d-cell"/><text x="96"  y="317" text-anchor="middle" class="d-num">V</text>
+              <rect x="116" y="294" width="36" height="36" rx="5" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="134" y="317" text-anchor="middle" class="d-num">M</text>
+              <rect x="154" y="294" width="36" height="36" rx="5" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="172" y="317" text-anchor="middle" class="d-num">X</text>
+              <rect x="192" y="294" width="36" height="36" rx="5" class="d-cell"/><text x="210" y="317" text-anchor="middle" class="d-num">D</text>
+              <rect x="230" y="294" width="36" height="36" rx="5" class="d-cell"/><text x="248" y="317" text-anchor="middle" class="d-num">I</text>
+              <rect x="268" y="294" width="36" height="36" rx="5" class="d-cell"/><text x="286" y="317" text-anchor="middle" class="d-num">Z</text>
+              <rect x="306" y="294" width="36" height="36" rx="5" class="d-cell"/><text x="324" y="317" text-anchor="middle" class="d-num">C</text>
+              <rect x="376" y="302" width="36" height="36" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.4" stroke-dasharray="4 3"/>
+              <text x="394" y="325" text-anchor="middle" class="d-num d-violet">E</text>
+              <line x1="342" y1="316" x2="372" y2="320" class="d-axis" stroke-width="1.4" stroke-dasharray="3 3"/>
+              <text x="376" y="356" class="d-sub">hidden emulation bit — swapped with C by XCE</text>
+
+              <!-- right column: PBR:PC, DBR, S, D -->
+              <text x="500" y="66" class="d-sub">where code runs · PBR supplies the bank, PC the offset</text>
+              <rect x="500" y="74" width="75" height="40" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="537" y="98" text-anchor="middle" class="d-num">PBR</text>
+              <rect x="583" y="74" width="300" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="733" y="93" text-anchor="middle" class="d-num">PC</text>
+              <text x="733" y="107" text-anchor="middle" class="d-sub">16-bit program counter</text>
+
+              <text x="500" y="146" class="d-sub">where absolute data lives</text>
+              <rect x="500" y="154" width="75" height="40" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="537" y="173" text-anchor="middle" class="d-num">DBR</text>
+              <text x="537" y="187" text-anchor="middle" class="d-sub">8-bit</text>
+              <text x="590" y="178" class="d-sub">bank glued onto 16-bit absolute addresses (Module 09)</text>
+
+              <text x="500" y="226" class="d-sub">stack &amp; direct page — both live in bank $00</text>
+              <rect x="500" y="234" width="300" height="40" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+              <text x="650" y="253" text-anchor="middle" class="d-num">S</text>
+              <text x="650" y="267" text-anchor="middle" class="d-sub">16-bit stack pointer (Module 05)</text>
+              <rect x="500" y="282" width="300" height="40" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <text x="650" y="301" text-anchor="middle" class="d-num">D</text>
+              <text x="650" y="315" text-anchor="middle" class="d-sub">16-bit direct-page base (Module 04)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Every register, drawn to width.</strong> A full-width box is 16 bits, a half-width box 8. The accumulator is really <code>B:A</code> — the <span class="term" data-tip="The M flag sets the accumulator/memory width. M=1 works in the 8-bit A; the high byte B is hidden but preserved. M=0 joins them into the 16-bit C accumulator.">M flag</span> hides or reveals B — while X and Y simply lose their high bytes when the X flag is 1 (Module 08 has the fine print). PBR prefixes the PC, DBR banks absolute data, and P is eight one-bit flags with the hidden E bit hanging off the side.</figcaption>
+          </figure>
+
+          <p>
+            All of this — which registers exist, every instruction the chip
+            understands, how each is encoded into bytes, what the flags mean —
+            is written down in the chip's
+            <span class="term" data-tip="Instruction Set Architecture — the documented contract between hardware and software: every instruction a chip understands, its byte encoding, its registers and flags. Any chip implementing the same ISA runs the same programs.">ISA</span>,
+            its <strong>instruction set architecture</strong>: the documented
+            contract between hardware and software. Write your program to the
+            contract and it runs on <em>any</em> chip that implements it — which
+            is exactly how the same 65816 ISA could serve the Apple IIGS and the
+            Super Nintendo, and why an emulator (Part III) is, at heart, a
+            program that honours the contract in software.
           </p>
 
           <h4>CISC: arithmetic that touches memory</h4>
@@ -449,6 +542,15 @@
             you chain bytes: add the low bytes, then add the high bytes
             <em>plus carry</em>, and you've added a 16-bit number on an 8-bit ALU.
           </p>
+          <p>
+            Here is overflow in four lines. Take <code>$7F</code> — read as
+            signed, +127, the largest positive byte. Add <code>$01</code>. The
+            adder produces <code>$80</code> — which, read as signed, is
+            <em>−128</em>. Two positives just made a negative: the sign came out
+            wrong, so the CPU sets <strong>V</strong>. (Carry stays clear —
+            nothing spilled past the top, and the unsigned reading 127 + 1 = 128
+            is perfectly correct.)
+          </p>
 
           <div class="analogy">
             <span class="lbl">Analogy · The odometer</span>
@@ -471,8 +573,10 @@
             arithmetic and instead treat each byte as two
             <span class="term" data-tip="Binary-Coded Decimal — each 4-bit nibble stores one decimal digit 0–9. The byte $25 read as BCD is the number twenty-five, not $25 = 37. Decimal mode makes ADC carry between nibbles at 10, not 16.">packed BCD</span>
             digits. In BCD, the byte <code>$25</code> literally means the number
-            <em>twenty-five</em> — the high nibble is the tens digit, the low
-            nibble the units — and <code>ADC</code> carries from the units to
+            <em>twenty-five</em> — each half of the byte (a
+            <span class="term" data-tip="Half a byte: four bits, exactly one hexadecimal digit. Every byte splits into a high nibble and a low nibble.">nibble</span>,
+            four bits, one hex digit) holds one decimal digit: the high nibble is
+            the tens, the low nibble the units — and <code>ADC</code> carries from the units to
             the tens at <em>10</em>, not 16. Add <code>$25</code> and
             <code>$18</code> in decimal mode and you get <code>$43</code>
             (forty-three), not <code>$3D</code>. It's built for score counters,
@@ -572,7 +676,12 @@
             no address at all. <strong>Absolute</strong> (<code>LDA $2000</code>)
             gives a 16-bit address, and the current <strong>data bank</strong>
             supplies the top 8 bits. <strong>Absolute long</strong>
-            (<code>LDA $7E2000</code>) spells out all 24 bits itself.
+            (<code>LDA $7E2000</code>) spells out all 24 bits itself. One
+            spelling habit to absorb now: the 65816 is
+            <span class="term" data-tip="Storing multi-byte values with the low byte first. On the 65816 the address $2000 sits in memory as the byte 00 followed by 20; the CPU reassembles them low-then-high.">little-endian</span>
+            — it stores multi-byte values <em>low byte first</em>. In memory the
+            operand <code>$2000</code> is the byte <code>00</code> followed by
+            <code>20</code>, and the CPU glues them back together low-then-high.
           </p>
           <p>
             Two register-backed shortcuts matter enormously. The
@@ -603,12 +712,67 @@
             </p>
           </div>
 
+          <figure class="figure">
+            <svg viewBox="0 0 940 330" role="img" aria-label="How LDA (dp),Y resolves: the operand byte plus D locate a pointer, DBR supplies the bank, Y is added, producing a 24-bit effective address">
+              <defs><marker id="fg4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg4c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker></defs>
+              <text x="40" y="30" class="d-tag">Anatomy of the workhorse — LDA ($10),Y</text>
+
+              <!-- inputs -->
+              <rect x="40" y="56" width="130" height="46" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="105" y="76" text-anchor="middle" class="d-num">operand $10</text>
+              <text x="105" y="92" text-anchor="middle" class="d-sub">1 byte after the opcode</text>
+              <rect x="40" y="118" width="130" height="46" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="105" y="138" text-anchor="middle" class="d-num">D = $1F00</text>
+              <text x="105" y="154" text-anchor="middle" class="d-sub">direct-page base</text>
+
+              <!-- adder 1 -->
+              <circle cx="228" cy="110" r="17" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="228" y="116" text-anchor="middle" class="d-label" style="font-size:16px">+</text>
+              <line x1="170" y1="79" x2="206" y2="100" class="d-axis" stroke-width="1.6" marker-end="url(#fg4a)"/>
+              <line x1="170" y1="141" x2="206" y2="120" class="d-axis" stroke-width="1.6" marker-end="url(#fg4a)"/>
+
+              <!-- pointer fetch -->
+              <rect x="272" y="80" width="190" height="60" rx="8" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="367" y="102" text-anchor="middle" class="d-num">read $00:1F10</text>
+              <text x="367" y="120" text-anchor="middle" class="d-sub">bytes 00 20 → pointer $2000</text>
+              <line x1="245" y1="110" x2="268" y2="110" class="d-axis" stroke-width="1.6" marker-end="url(#fg4a)"/>
+
+              <!-- DBR glue -->
+              <rect x="272" y="196" width="130" height="46" rx="8" class="d-fill-panel2 d-violet-s" stroke-width="1.4"/>
+              <text x="337" y="216" text-anchor="middle" class="d-num">DBR = $7E</text>
+              <text x="337" y="232" text-anchor="middle" class="d-sub">supplies the bank</text>
+              <rect x="500" y="150" width="180" height="56" rx="8" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="590" y="172" text-anchor="middle" class="d-num">base $7E:2000</text>
+              <text x="590" y="190" text-anchor="middle" class="d-sub">bank : pointer</text>
+              <path d="M 462 110 C 490 110, 490 160, 498 166" fill="none" stroke="#45e4d1" stroke-width="1.6" marker-end="url(#fg4c)"/>
+              <path d="M 402 219 C 450 219, 460 196, 496 188" fill="none" stroke="#877f9e" stroke-width="1.6" marker-end="url(#fg4a)"/>
+
+              <!-- + Y -->
+              <rect x="500" y="56" width="130" height="46" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="565" y="76" text-anchor="middle" class="d-num">Y = $0010</text>
+              <text x="565" y="92" text-anchor="middle" class="d-sub">the index — walks the array</text>
+              <circle cx="722" cy="178" r="17" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="722" y="184" text-anchor="middle" class="d-label" style="font-size:16px">+</text>
+              <line x1="680" y1="178" x2="700" y2="178" class="d-axis" stroke-width="1.6" marker-end="url(#fg4a)"/>
+              <path d="M 630 79 C 700 84, 716 130, 722 156" fill="none" stroke="#877f9e" stroke-width="1.6" marker-end="url(#fg4a)"/>
+
+              <!-- result -->
+              <rect x="762" y="148" width="150" height="60" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.8"/>
+              <text x="837" y="172" text-anchor="middle" class="d-num d-violet">$7E2010</text>
+              <text x="837" y="192" text-anchor="middle" class="d-sub">24-bit effective address</text>
+              <line x1="739" y1="178" x2="758" y2="178" class="d-axis" stroke-width="1.6" marker-end="url(#fg4a)"/>
+
+              <text x="40" y="296" class="d-sub">operand + D → find the pointer · read the pointer · DBR supplies the bank · add Y → the address actually read</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Four little sums, one address.</strong> <code>LDA ($10),Y</code> adds the operand to <span class="term" data-tip="The direct page register D — a 16-bit base added to the small operand of direct-page modes, always in bank $00.">D</span> to locate a pointer in bank 0, reads the 16-bit pointer stored there (little-endian!), borrows the bank from <span class="term" data-tip="The data bank register DBR supplies the top 8 bits (the bank) for absolute and indirect addressing.">DBR</span>, then adds Y. The lab below runs these exact numbers.</figcaption>
+          </figure>
+
           <p>
             The lab lets you pick a mode and watch it resolve. The register file
             is fixed at plausible values (data bank <code>$7E</code>, direct page
             <code>$1F00</code>, X = 4, Y = $10, stack at <code>$01FF</code>); a
             small memory holds the pointers the indirect modes chase. Choose a
-            mode and read the numbered steps combine the operand with the
+            mode and watch the numbered steps combine the operand with the
             highlighted registers into one 24-bit effective address.
           </p>
 
@@ -629,8 +793,8 @@
                     <option value="dind">DP Indirect — LDA ($10)</option>
                     <option value="dindl">DP Indirect Long — LDA [$10]</option>
                     <option value="dindy">DP Indirect Indexed,Y — LDA ($10),Y</option>
-                    <option value="sr">Stack Relative — LDA $02,S</option>
-                    <option value="sriy">SR Indirect Indexed,Y — LDA ($02,S),Y</option>
+                    <option value="sr">Stack Relative — LDA $02,S (uses the stack — Module 05)</option>
+                    <option value="sriy">SR Indirect Indexed,Y — LDA ($02,S),Y (uses the stack — Module 05)</option>
                   </select>
                 </div>
               </div>
@@ -705,10 +869,17 @@
             memory allows — each <code>RTS</code> unwinds one level. The 65816
             adds long versions for its 24-bit world: <code>JSL</code> pushes the
             program <em>bank</em> too and <code>RTL</code> restores it, so a
-            subroutine can live in a different 64 KB bank. And
-            <strong>interrupts</strong> (Module 06) use the very same mechanism —
-            they push the return address <em>and</em> the status register P, so
-            the interrupted code can be resumed exactly as it was.
+            subroutine can live in a different 64 KB bank. One convention worth
+            knowing, because every 65xx debugger shows it: <code>JSR</code>
+            actually pushes the address of the <em>last byte of the JSR
+            instruction itself</em>, not of the instruction after it — and
+            <code>RTS</code> compensates by adding 1 to the address it pulls
+            before resuming. You'll see that +1 happen in the lab's narration.
+            And <strong>interrupts</strong> (Module 06) use the very same
+            mechanism — they push the return address (in native mode the program
+            bank PBR too) <em>and</em> the status register P, so
+            <code>RTI</code> can restore everything and the interrupted code
+            resumes exactly as it was.
           </p>
 
           <div class="analogy">
@@ -725,6 +896,50 @@
               nesting sane.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 400" role="img" aria-label="Three nested subroutine calls and the stack after them: three two-byte return addresses stacked downward, with S pointing below the newest">
+              <defs><marker id="fg5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="40" y="30" class="d-tag">Three calls deep — what the stack remembers</text>
+
+              <!-- call chain -->
+              <rect x="40" y="56" width="220" height="52" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="150" y="78" text-anchor="middle" class="d-num">main</text>
+              <text x="150" y="96" text-anchor="middle" class="d-sub">JSR SubA at $8005–$8007</text>
+              <rect x="40" y="140" width="220" height="52" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="150" y="162" text-anchor="middle" class="d-num">SubA</text>
+              <text x="150" y="180" text-anchor="middle" class="d-sub">JSR SubB at $8105–$8107</text>
+              <rect x="40" y="224" width="220" height="52" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="150" y="246" text-anchor="middle" class="d-num">SubB</text>
+              <text x="150" y="264" text-anchor="middle" class="d-sub">JSR SubC at $8205–$8207</text>
+              <rect x="40" y="308" width="220" height="52" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="150" y="330" text-anchor="middle" class="d-num">SubC</text>
+              <text x="150" y="348" text-anchor="middle" class="d-sub">running now</text>
+              <line x1="150" y1="108" x2="150" y2="136" class="d-axis" stroke-width="1.6" marker-end="url(#fg5a)"/>
+              <line x1="150" y1="192" x2="150" y2="220" class="d-axis" stroke-width="1.6" marker-end="url(#fg5a)"/>
+              <line x1="150" y1="276" x2="150" y2="304" class="d-axis" stroke-width="1.6" marker-end="url(#fg5a)"/>
+
+              <!-- stack -->
+              <text x="480" y="56" class="d-sub">page-1 stack · grows downward ↓</text>
+              <rect x="480" y="66"  width="180" height="34" rx="5" class="d-cell"/><text x="492" y="88" class="d-num">$01FF · $80</text>
+              <rect x="480" y="104" width="180" height="34" rx="5" class="d-cell"/><text x="492" y="126" class="d-num">$01FE · $07</text>
+              <rect x="480" y="142" width="180" height="34" rx="5" class="d-cell"/><text x="492" y="164" class="d-num">$01FD · $81</text>
+              <rect x="480" y="180" width="180" height="34" rx="5" class="d-cell"/><text x="492" y="202" class="d-num">$01FC · $07</text>
+              <rect x="480" y="218" width="180" height="34" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="492" y="240" class="d-num">$01FB · $82</text>
+              <rect x="480" y="256" width="180" height="34" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="492" y="278" class="d-num">$01FA · $07</text>
+              <rect x="480" y="294" width="180" height="34" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.5" stroke-dasharray="5 4"/><text x="492" y="316" class="d-num d-violet">$01F9 · S →</text>
+              <text x="492" y="344" class="d-sub">next free byte — the next push lands here</text>
+
+              <!-- frame labels -->
+              <text x="676" y="88"  class="d-sub">┐ ret $8007 (+1 → $8008)</text>
+              <text x="676" y="126" class="d-sub">┘ frame 1 · back into main</text>
+              <text x="676" y="164" class="d-sub">┐ ret $8107 (+1 → $8108)</text>
+              <text x="676" y="202" class="d-sub">┘ frame 2 · back into SubA</text>
+              <text x="676" y="240" class="d-sub">┐ ret $8207 (+1 → $8208)</text>
+              <text x="676" y="278" class="d-sub">┘ frame 3 · back into SubB</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The receipts of three nested calls.</strong> Each <code>JSR</code> pushed a two-byte return address (high byte first, so it reads low-then-high in memory) — the address of the JSR's own last byte, which <code>RTS</code> will pull and add 1 to. Three frames deep, <span class="term" data-tip="The stack pointer S — always marks the next free byte; everything above it is live stack.">S</span> has walked down six bytes; each RTS will unwind exactly one frame, newest first.</figcaption>
+          </figure>
 
           <p>
             Play with it below. <strong>PHA</strong> pushes the accumulator;
@@ -765,7 +980,7 @@
               <li>The stack is a last-in-first-out scratch area; the stack pointer S marks the top, and it grows downward.</li>
               <li>Emulation mode locks the stack to page 1 ($0100–$01FF); native mode frees S to roam all of bank 0.</li>
               <li>JSR/RTS push and pull a return address; JSL/RTL do it across banks for the 24-bit world.</li>
-              <li>Interrupts push the return address <em>and</em> the P status register, so interrupted code resumes intact.</li>
+              <li>Interrupts push the return address (plus PBR in native mode) <em>and</em> the P status register, so RTI resumes interrupted code intact.</li>
             </ul>
           </div>
 
@@ -795,7 +1010,19 @@
             <span class="term" data-tip="Return from interrupt — pulls the saved status register P and the return address back off the stack, resuming the interrupted code exactly where it left off.">RTI</span>,
             resume the interrupted code exactly where it left off. The stack from
             Module 05 is what makes that clean resume possible: the interrupt
-            pushes the return address and the P register before jumping.
+            pushes the return address (in native mode the program bank PBR too)
+            and the P register before jumping, and RTI restores them all.
+          </p>
+          <p>
+            Because so much of this module is about the television, here is how
+            a television of that era actually drew. A CRT paints the picture
+            with an electron beam sweeping <strong>left to right</strong>, one
+            thin <strong>scanline</strong> at a time, working from the
+            <strong>top of the screen to the bottom</strong> — on an NTSC
+            console, 262 scanlines per frame, about 60 frames every second.
+            After the last visible line the beam must travel back up to the
+            top-left corner, and that enforced pause — a band of lines during
+            which nothing is being drawn — is the <em>vertical blank</em>.
           </p>
           <p>
             The Super Nintendo's CPU listens for three: <strong>NMI</strong>
@@ -805,12 +1032,26 @@
             update video memory; <strong>IRQ</strong> (interrupt request), which
             games program to fire at a chosen horizontal/vertical beam position
             for mid-screen effects; and <strong>RESET</strong>, which starts the
-            machine. How does the CPU know where each handler lives? A fixed
-            <span class="term" data-tip="A small table of addresses at the very top of memory ($FFE0–$FFFF) telling the CPU where to jump for each interrupt — NMI, IRQ, RESET, BRK. Native and emulation mode use different entries.">vector table</span>
-            at the top of bank 0: the NMI handler's address sits at
-            <code>$FFEA</code> (native mode), IRQ at <code>$FFEE</code>, and
-            RESET at <code>$FFFC</code>. On an interrupt the CPU reads the
-            address there and jumps to it — no guessing.
+            machine. The names are literal, and they connect back to a flag from
+            Module 02: IRQ is a <em>request</em> the program may refuse —
+            setting the <strong>I</strong> flag masks it — while NMI is
+            <em>non-maskable</em>: no flag can shut it out.
+          </p>
+          <p>
+            How does the CPU know where each handler lives? A fixed
+            <span class="term" data-tip="A small table of addresses at the very top of bank 0 ($FFE0–$FFFF) telling the CPU where to jump for each interrupt. There are two sets of entries: one used in native mode, one in emulation mode.">vector table</span>
+            at the top of bank 0 — and there are really <em>two</em> of them,
+            one per personality of the chip (Module 08 explains the two modes).
+            In <strong>native mode</strong> the entries are: COP
+            <code>$FFE4</code>, BRK <code>$FFE6</code>, NMI <code>$FFEA</code>,
+            IRQ <code>$FFEE</code>. In <strong>emulation mode</strong>, the
+            6502-style set: COP <code>$FFF4</code>, NMI <code>$FFFA</code>,
+            RESET <code>$FFFC</code>, and one shared IRQ/BRK entry at
+            <code>$FFFE</code>. Notice RESET appears only in the emulation
+            column: <strong>the 65816 always wakes up in emulation mode</strong>,
+            which is why the first thing nearly every game does is the
+            mode-switch spell you'll meet in Module 08. On an interrupt the CPU
+            reads the address from the right slot and jumps — no guessing.
           </p>
 
           <div class="analogy">
@@ -826,13 +1067,61 @@
             </p>
           </div>
 
+          <figure class="figure">
+            <svg viewBox="0 0 940 380" role="img" aria-label="The two interrupt vector tables — native and emulation mode — with arrows from each vector cell to its handler; RESET exists only in the emulation table">
+              <defs><marker id="fg6a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg6c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker><marker id="fg6m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ffb14e"/></marker></defs>
+              <text x="40" y="30" class="d-tag">Two vector tables at the top of bank $00 — each cell holds a 16-bit handler address</text>
+
+              <text x="70" y="72" class="d-label" style="font-size:13px">Native mode (E = 0)</text>
+              <rect x="70" y="84"  width="240" height="38" rx="6" class="d-cell"/><text x="84" y="108" class="d-num">$FFE4 · COP</text>
+              <rect x="70" y="126" width="240" height="38" rx="6" class="d-cell"/><text x="84" y="150" class="d-num">$FFE6 · BRK</text>
+              <rect x="70" y="168" width="240" height="38" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="84" y="192" class="d-num">$FFEA · NMI</text>
+              <rect x="70" y="210" width="240" height="38" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4"/><text x="84" y="234" class="d-num">$FFEE · IRQ</text>
+              <text x="70" y="272" class="d-sub">no RESET entry here —</text>
+              <text x="70" y="288" class="d-sub">you can't wake up in native mode</text>
+
+              <text x="380" y="72" class="d-label" style="font-size:13px">Emulation mode (E = 1)</text>
+              <rect x="380" y="84"  width="240" height="38" rx="6" class="d-cell"/><text x="394" y="108" class="d-num">$FFF4 · COP</text>
+              <rect x="380" y="126" width="240" height="38" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4" stroke-dasharray="5 4"/><text x="394" y="150" class="d-num">$FFFA · NMI</text>
+              <rect x="380" y="168" width="240" height="38" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.5"/><text x="394" y="192" class="d-num">$FFFC · RESET</text>
+              <rect x="380" y="210" width="240" height="38" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4" stroke-dasharray="5 4"/><text x="394" y="234" class="d-num">$FFFE · IRQ / BRK</text>
+              <text x="380" y="272" class="d-sub">IRQ and BRK share one entry,</text>
+              <text x="380" y="288" class="d-sub">just like the 6502</text>
+
+              <!-- handlers -->
+              <rect x="720" y="96" width="180" height="50" rx="8" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="810" y="117" text-anchor="middle" class="d-num">NMI handler</text>
+              <text x="810" y="134" text-anchor="middle" class="d-sub">runs every V-blank</text>
+              <rect x="720" y="166" width="180" height="50" rx="8" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="810" y="187" text-anchor="middle" class="d-num">IRQ handler</text>
+              <text x="810" y="204" text-anchor="middle" class="d-sub">fires at a beam position</text>
+              <rect x="720" y="236" width="180" height="64" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="810" y="258" text-anchor="middle" class="d-num">boot code</text>
+              <text x="810" y="275" text-anchor="middle" class="d-sub">always starts in emulation</text>
+              <text x="810" y="290" text-anchor="middle" class="d-sub">mode → CLC : XCE (Mod 08)</text>
+
+              <path d="M 310 187 C 560 187, 600 118, 716 118" fill="none" stroke="#45e4d1" stroke-width="1.7" marker-end="url(#fg6c)"/>
+              <path d="M 620 145 C 670 140, 680 124, 716 121" fill="none" stroke="#45e4d1" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#fg6c)"/>
+              <path d="M 310 229 C 560 229, 600 191, 716 191" fill="none" stroke="#a884ff" stroke-width="1.7" marker-end="url(#fg6a)"/>
+              <path d="M 620 187 C 670 187, 680 262, 716 265" fill="none" stroke="#ffb14e" stroke-width="1.7" marker-end="url(#fg6m)"/>
+              <text x="640" y="330" class="d-flow">power on → read $FFFC → jump</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two tables, one per personality.</strong> Native mode reads the <code>$FFE4–$FFEE</code> column; emulation mode the 6502-compatible <code>$FFF4–$FFFE</code> column. RESET exists only on the emulation side — the chip <em>always</em> boots as a 6502, which is exactly the situation Module 08 picks up from.</figcaption>
+          </figure>
+
           <h4>The clock, and why it has three speeds</h4>
           <p>
-            The 5A22 generates one <strong>master clock</strong> — about
-            <strong>21.477&nbsp;MHz</strong> on an NTSC console — and every part
-            of the machine steps off it. The CPU does <em>not</em> run at that
-            rate; instead each memory access takes a whole number of master
-            cycles, and that number depends on <em>what</em> is being accessed.
+            First, what a clock even <em>is</em>, with numbers. A quartz crystal
+            on the console's circuit board vibrates about 21 million times a
+            second — precisely <strong>21.477&nbsp;<span class="term" data-tip="Megahertz — millions of cycles per second. 21.477 MHz means the master clock ticks 21,477,000 times every second.">MHz</span></strong>
+            on an NTSC console — and provides the <strong>master clock</strong>:
+            a metronome ticking 21 million times a second, where each tick is
+            one <strong>master cycle</strong>, the smallest unit of time the
+            console knows. The 5A22 doesn't generate that beat; it takes the
+            crystal's signal and <em>divides</em> it. The CPU does <em>not</em>
+            run one instruction per tick; instead each memory access takes a
+            whole number of master cycles, and that number depends on
+            <em>what</em> is being accessed.
             Fast regions (including cartridge ROM wired for
             <span class="term" data-tip="A cartridge and mapping wired so the CPU can read ROM at the fastest 6-master-cycle (3.58 MHz) speed. SlowROM carts read at 8 cycles instead.">FastROM</span>)
             cost <strong>6</strong> master cycles per access — an effective
@@ -844,6 +1133,32 @@
             <strong>1.79&nbsp;MHz</strong>. Same CPU, three speeds, chosen by the
             address bus.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 240" role="img" aria-label="The 21.477 MHz master clock as a train of ticks, gated into memory accesses of 6, 8 or 12 ticks depending on the region">
+              <text x="40" y="28" class="d-tag">One tick-train, three access lengths</text>
+              <text x="40" y="52" class="d-sub">master clock · 21.477 MHz — every vertical stroke is one master cycle</text>
+              <g class="d-axis" stroke-width="1.4">
+                <line x1="60" y1="62" x2="900" y2="62" stroke="#392f57"/>
+              </g>
+              <g stroke="#877f9e" stroke-width="1.6">
+                <line x1="60"  y1="56" x2="60"  y2="70"/><line x1="77.5" y1="56" x2="77.5" y2="70"/><line x1="95"  y1="56" x2="95"  y2="70"/><line x1="112.5" y1="56" x2="112.5" y2="70"/><line x1="130" y1="56" x2="130" y2="70"/><line x1="147.5" y1="56" x2="147.5" y2="70"/><line x1="165" y1="56" x2="165" y2="70"/><line x1="182.5" y1="56" x2="182.5" y2="70"/><line x1="200" y1="56" x2="200" y2="70"/><line x1="217.5" y1="56" x2="217.5" y2="70"/><line x1="235" y1="56" x2="235" y2="70"/><line x1="252.5" y1="56" x2="252.5" y2="70"/><line x1="270" y1="56" x2="270" y2="70"/><line x1="287.5" y1="56" x2="287.5" y2="70"/><line x1="305" y1="56" x2="305" y2="70"/><line x1="322.5" y1="56" x2="322.5" y2="70"/><line x1="340" y1="56" x2="340" y2="70"/><line x1="357.5" y1="56" x2="357.5" y2="70"/><line x1="375" y1="56" x2="375" y2="70"/><line x1="392.5" y1="56" x2="392.5" y2="70"/><line x1="410" y1="56" x2="410" y2="70"/><line x1="427.5" y1="56" x2="427.5" y2="70"/><line x1="445" y1="56" x2="445" y2="70"/><line x1="462.5" y1="56" x2="462.5" y2="70"/><line x1="480" y1="56" x2="480" y2="70"/><line x1="497.5" y1="56" x2="497.5" y2="70"/><line x1="515" y1="56" x2="515" y2="70"/><line x1="532.5" y1="56" x2="532.5" y2="70"/><line x1="550" y1="56" x2="550" y2="70"/><line x1="567.5" y1="56" x2="567.5" y2="70"/><line x1="585" y1="56" x2="585" y2="70"/><line x1="602.5" y1="56" x2="602.5" y2="70"/><line x1="620" y1="56" x2="620" y2="70"/><line x1="637.5" y1="56" x2="637.5" y2="70"/><line x1="655" y1="56" x2="655" y2="70"/><line x1="672.5" y1="56" x2="672.5" y2="70"/><line x1="690" y1="56" x2="690" y2="70"/><line x1="707.5" y1="56" x2="707.5" y2="70"/><line x1="725" y1="56" x2="725" y2="70"/><line x1="742.5" y1="56" x2="742.5" y2="70"/><line x1="760" y1="56" x2="760" y2="70"/><line x1="777.5" y1="56" x2="777.5" y2="70"/><line x1="795" y1="56" x2="795" y2="70"/><line x1="812.5" y1="56" x2="812.5" y2="70"/><line x1="830" y1="56" x2="830" y2="70"/><line x1="847.5" y1="56" x2="847.5" y2="70"/><line x1="865" y1="56" x2="865" y2="70"/><line x1="882.5" y1="56" x2="882.5" y2="70"/><line x1="900" y1="56" x2="900" y2="70"/>
+              </g>
+
+              <rect x="60" y="90" width="105" height="30" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <rect x="165" y="90" width="105" height="30" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4" opacity="0.55"/>
+              <text x="290" y="110" class="d-sub"><tspan class="d-cyan">FastROM access · 6 cycles</tspan> → 3.58 MHz effective</text>
+
+              <rect x="60" y="140" width="140" height="30" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <rect x="200" y="140" width="140" height="30" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.4" opacity="0.55"/>
+              <text x="360" y="160" class="d-sub"><tspan class="d-violet">SlowROM / WRAM access · 8 cycles</tspan> → 2.68 MHz</text>
+
+              <rect x="60" y="190" width="210" height="30" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <rect x="270" y="190" width="210" height="30" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4" opacity="0.55"/>
+              <text x="500" y="210" class="d-sub"><tspan class="d-amber">slow I/O access · 12 cycles</tspan> → 1.79 MHz ($4000–$41FF)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Division, not magic.</strong> The crystal's 21.477 MHz tick-train is the only clock there is; the 5A22 simply lets each memory access consume 6, 8 or 12 ticks depending on the address. Slower region → more ticks per access → a lower effective MHz for code touching it.</figcaption>
+          </figure>
 
           <p>
             The lab draws one NTSC frame as a vertical timeline: 262 scanlines,
@@ -889,8 +1204,8 @@
             <ul>
               <li>An interrupt makes the CPU save its place on the stack and jump to a handler, then resume via RTI.</li>
               <li>NMI fires at V-blank (the only safe time to touch video memory); IRQ fires at a chosen beam position; RESET boots the machine.</li>
-              <li>The vector table at $FFE0–$FFFF tells the CPU where each handler lives — NMI native at $FFEA.</li>
-              <li>One 21.477 MHz master clock divides into 3.58 / 2.68 / 1.79 MHz CPU access speeds, chosen by the address.</li>
+              <li>Two vector tables at $FFE0–$FFFF — native (NMI $FFEA, IRQ $FFEE, BRK $FFE6, COP $FFE4) and emulation (NMI $FFFA, IRQ/BRK $FFFE, COP $FFF4, RESET $FFFC); RESET always lands in emulation mode.</li>
+              <li>The board's crystal provides the 21.477 MHz master clock; the 5A22 divides it into 3.58 / 2.68 / 1.79 MHz access speeds, chosen by the address.</li>
             </ul>
           </div>
 
@@ -932,8 +1247,10 @@
           <p>
             The Super Nintendo's CPU chip is the <strong>Ricoh 5A22</strong>. At
             its heart is a <strong>65C816</strong> processor core — the 16-bit
-            successor to the 6502 that ran the NES, the Apple II and the
-            Commodore 64. But the 5A22 is more than the core: Ricoh integrated
+            successor to the 6502 <em>family</em> that powered a generation of
+            home machines: the Apple II used the 6502 itself, the Commodore 64
+            its 6510 variant, and the NES a Ricoh 2A03 built around a 6502 core.
+            But the 5A22 is more than the core: Ricoh integrated
             onto the same die a set of peripherals that would otherwise need
             separate chips. That's why we call it the 5A22 and not just
             &ldquo;the 65816&rdquo; — the CPU you program is the core, but the
@@ -945,10 +1262,16 @@
             without the CPU lifting a finger — Modules 10 and 11), a
             <strong>hardware multiply and divide unit</strong> (the 65816 core
             can't multiply on its own — Module 12), the <strong>parallel I/O and
-            controller ports</strong> plus automatic joypad reading,
-            <strong>WRAM refresh</strong> logic to keep the 128 KB of work RAM
-            alive, and the <strong>clock generation</strong> that produces the
-            21.477&nbsp;MHz master signal the whole console marches to. The core
+            controller ports</strong> plus automatic joypad reading, the
+            <strong>H/V counters and timer</strong> that track the drawing
+            beam's position and can fire an IRQ at a chosen screen coordinate
+            (Module 14 returns to these), <strong>WRAM refresh</strong> logic to
+            keep the 128 KB of work RAM alive — work RAM is DRAM, which forgets
+            its contents within milliseconds unless every row is periodically
+            re-read, so the 5A22 quietly does that re-reading itself — and the
+            <strong>clock circuitry</strong> that takes the 21.477&nbsp;MHz
+            master signal from the board's quartz crystal and divides it into
+            the access speeds of Module 06. The core
             thinks; the 5A22's peripherals do the heavy lifting around it.
           </p>
 
@@ -981,7 +1304,7 @@
               <rect x="260" y="166" width="210" height="38" rx="8" class="d-fill-panel d-amber-s" stroke-width="1.3"/><text x="365" y="190" text-anchor="middle" class="d-sub">multiply / divide · Mod 12</text>
               <rect x="44" y="220" width="200" height="38" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.3"/><text x="144" y="244" text-anchor="middle" class="d-sub">I/O + joypad ports</text>
               <rect x="260" y="220" width="210" height="38" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/><text x="365" y="244" text-anchor="middle" class="d-sub">WRAM refresh</text>
-              <rect x="44" y="274" width="426" height="38" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/><text x="257" y="298" text-anchor="middle" class="d-sub">clock generation → 6 / 8 / 12 master cycles per access</text>
+              <rect x="44" y="274" width="426" height="38" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/><text x="257" y="298" text-anchor="middle" class="d-sub">clock divider (crystal in) → 6 / 8 / 12 master cycles per access</text>
               <text x="44" y="348" class="d-sub">a 65816 core plus everything a console needs, on one die</text>
 
               <rect x="540" y="70" width="180" height="60" rx="10" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
@@ -1024,7 +1347,7 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li>The SNES CPU chip is the Ricoh 5A22: a 65C816 core plus Nintendo's on-die peripherals.</li>
-              <li>Those peripherals are the DMA/HDMA controllers, the multiply/divide unit, I/O and joypad ports, WRAM refresh, and clock generation.</li>
+              <li>Those peripherals are the DMA/HDMA controllers, the multiply/divide unit, I/O and joypad ports, the H/V counters and timer IRQ, WRAM refresh, and the clock divider.</li>
               <li>The core is the processor you program; the 5A22's extras do the fast data movement and math around it.</li>
               <li>One 21.477 MHz master clock feeds the three region access speeds from Module 06.</li>
             </ul>
@@ -1060,10 +1383,24 @@
             The <strong>M flag</strong> sets the <em>accumulator and memory</em>
             width: M = 0 makes A a full 16-bit register, M = 1 keeps it 8-bit. The
             <strong>X flag</strong> sets the <em>index registers</em> X and Y the
-            same way. You flip them whenever you like with <code>REP</code> (reset
-            = clear the bits, going 16-bit) and <code>SEP</code> (set the bits,
-            going 8-bit). Want 16-bit maths but 8-bit loop counters? Set M = 0,
-            X = 1. It's yours.
+            same way. You flip them whenever you like with <code>REP</code>
+            (reset = clear flag bits, going 16-bit) and <code>SEP</code> (set
+            flag bits, going 8-bit); each takes an operand mask naming the P
+            bits to touch — <code>REP #$30</code> clears both M and X
+            (everything 16-bit), <code>SEP #$20</code> sets just M (8-bit A,
+            16-bit indexes). Want 16-bit maths but 8-bit loop counters? Set
+            M = 0, X = 1. It's yours.
+          </p>
+          <p>
+            Two follow-on traps hide in the resizing itself. Setting X = 1 is
+            <em>destructive</em>: the high bytes of X and Y are forced to $00
+            and their old contents are gone — flip back to 16-bit and they stay
+            zero. Setting M = 1 is gentler: A's high byte (called
+            <strong>B</strong>) is hidden, not erased, and reappears intact when
+            M returns to 0 — you can even swap it in and out with
+            <code>XBA</code>. And emulation mode simply forces M = X = 1
+            outright, one more reason the <code>CLC</code>:<code>XCE</code>
+            escape is the first thing games run.
           </p>
           <p>
             And now the classic gotcha. An immediate instruction like
@@ -1107,7 +1444,7 @@
                 <span style="font-size:12.5px;color:var(--muted)">Native mode · click to flip:</span>
                 <button class="flag-toggle" data-width-m><span class="fk">M</span><span class="fs">8-bit</span></button>
                 <button class="flag-toggle" data-width-x><span class="fk">X</span><span class="fs">8-bit</span></button>
-                <span style="font-size:12.5px;color:var(--muted)">off = 8-bit · lit = 16-bit</span>
+                <span style="font-size:12.5px;color:var(--muted)">note the polarity: flag <b>set</b> (1) = 8-bit · flag <b>clear</b> (0, lit button) = 16-bit</span>
               </div>
               <div>
                 <div class="lab-sub" style="margin-bottom:8px">Registers resize with the flags</div>
@@ -1125,7 +1462,8 @@
             <ul>
               <li>The 65816 boots in 6502 emulation mode; CLC:XCE switches it to native 16-bit mode via the hidden E flag.</li>
               <li>In native mode, the M flag sets accumulator/memory width and the X flag sets index width — each 8 or 16 bit.</li>
-              <li>REP clears the flags (16-bit); SEP sets them (8-bit) — toggle at will, even mid-routine.</li>
+              <li>REP #$30 clears the flags (16-bit); SEP #$30 sets them (8-bit) — toggle at will, even mid-routine.</li>
+              <li>X = 1 destroys the high bytes of X/Y (forced $00); M = 1 merely hides A's B byte; emulation mode forces M = X = 1.</li>
               <li>Immediate operand length tracks the flags, so the same bytes decode into different instructions depending on M/X.</li>
             </ul>
           </div>
@@ -1161,7 +1499,12 @@
             <strong>memory map</strong>, and it's worth knowing by heart. The
             128 KB of work RAM lives in banks <strong>$7E–$7F</strong>; the low
             8 KB (<code>$0000–$1FFF</code>) is mirrored into the bottom of every
-            &ldquo;system&rdquo; bank so zero-page-style code reaches it quickly.
+            &ldquo;system&rdquo; bank. The win isn't speed — the mirror is
+            metered at the same 8 cycles — it's <em>encoding</em>: with the
+            mirror under its feet, code can reach that RAM through short
+            one-byte direct-page operands and plain absolute addresses,
+            whatever the DBR currently points at, instead of spelling out
+            24-bit long addresses into $7E.
             The hardware registers sit in a narrow band of every system bank:
             the <strong>PPU</strong> (video) at <code>$2100–$213F</code>, the
             <strong>APU</strong> (sound) mailbox ports at
@@ -1184,6 +1527,105 @@
               are which floor you're currently standing on.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 660" role="img" aria-label="Poster of the full 24-bit SNES memory map: 256 banks across, 64 KB of offsets down, showing WRAM in banks 7E and 7F, the mirrored system-bank layout with WRAM mirror and register bands, LoROM cartridge halves, and the FastROM mirror from bank 80 up">
+              <text x="40" y="30" class="d-tag">The whole 16 MB, in one picture — banks $00–$FF across, offset $0000–$FFFF down (LoROM)</text>
+              <text x="40" y="50" class="d-sub">every column is one 64 KB bank · thin register bands widened so you can see them</text>
+
+              <!-- bank axis -->
+              <text x="120" y="78" class="d-sub">$00</text>
+              <text x="217" y="78" class="d-sub">$20</text>
+              <text x="315" y="78" class="d-sub">$40</text>
+              <text x="412" y="78" class="d-sub">$60</text>
+              <text x="510" y="78" class="d-sub">$80</text>
+              <text x="607" y="78" class="d-sub">$A0</text>
+              <text x="705" y="78" class="d-sub">$C0</text>
+              <text x="802" y="78" class="d-sub">$E0</text>
+              <text x="900" y="78" text-anchor="end" class="d-sub">$FF</text>
+              <text x="472" y="64" class="d-flow d-cyan">$7E–$7F ↓</text>
+
+              <!-- offset axis -->
+              <text x="112" y="98"  text-anchor="end" class="d-sub">$0000</text>
+              <text x="112" y="152" text-anchor="end" class="d-sub">$2100</text>
+              <text x="112" y="178" text-anchor="end" class="d-sub">$2140</text>
+              <text x="112" y="243" text-anchor="end" class="d-sub">$4000</text>
+              <text x="112" y="260" text-anchor="end" class="d-sub">$4200</text>
+              <text x="112" y="278" text-anchor="end" class="d-sub">$4300</text>
+              <text x="112" y="340" text-anchor="end" class="d-sub">$8000</text>
+              <text x="112" y="558" text-anchor="end" class="d-sub">$FFFF</text>
+
+              <!-- system banks $00–$3F -->
+              <g>
+                <rect x="120" y="90"  width="195" height="45" class="d-fill-panel"/><rect x="120" y="90" width="195" height="45" fill="#45e4d1" opacity="0.55"/>
+                <rect x="120" y="135" width="195" height="15" class="d-fill-panel"/>
+                <rect x="120" y="150" width="195" height="20" fill="#a884ff" opacity="0.8"/>
+                <rect x="120" y="170" width="195" height="9"  fill="#ff5f9e" opacity="0.85"/>
+                <rect x="120" y="179" width="195" height="6"  fill="#45e4d1" opacity="0.8"/>
+                <rect x="120" y="185" width="195" height="47" class="d-fill-panel"/>
+                <rect x="120" y="232" width="195" height="14" fill="#ffb14e" opacity="0.5"/>
+                <rect x="120" y="246" width="195" height="18" fill="#ffb14e" opacity="0.85"/>
+                <rect x="120" y="264" width="195" height="18" fill="#a884ff" opacity="0.6"/>
+                <rect x="120" y="282" width="195" height="48" class="d-fill-panel"/>
+                <rect x="120" y="330" width="195" height="230" fill="#5fd18b" opacity="0.55"/>
+                <text x="217" y="109" text-anchor="middle" class="d-num" style="font-size:11px">WRAM mirror</text>
+                <text x="217" y="124" text-anchor="middle" class="d-sub" style="font-size:9.5px">= $7E:0000–$1FFF</text>
+                <text x="217" y="164" text-anchor="middle" class="d-sub" style="font-size:9.5px">PPU regs $2100–$213F</text>
+                <text x="217" y="259" text-anchor="middle" class="d-sub" style="font-size:9.5px">CPU regs $4200–$421F</text>
+                <text x="217" y="277" text-anchor="middle" class="d-sub" style="font-size:9.5px">DMA regs $4300–$437F</text>
+                <text x="217" y="310" text-anchor="middle" class="d-sub" style="font-size:9.5px">open bus / expansion</text>
+                <text x="217" y="430" text-anchor="middle" class="d-num" style="font-size:11px">cart ROM</text>
+                <text x="217" y="447" text-anchor="middle" class="d-sub" style="font-size:9.5px">LoROM 32 KB half</text>
+              </g>
+
+              <!-- cart banks $40–$7D -->
+              <rect x="315" y="90" width="189" height="470" fill="#5fd18b" opacity="0.35"/>
+              <text x="409" y="320" text-anchor="middle" class="d-num" style="font-size:11px">cartridge</text>
+              <text x="409" y="337" text-anchor="middle" class="d-sub" style="font-size:9.5px">$40–$7D · mapper-dependent</text>
+
+              <!-- WRAM $7E–$7F -->
+              <rect x="504" y="90" width="6" height="470" fill="#45e4d1"/>
+
+              <!-- system banks $80–$BF (FastROM mirror) -->
+              <g>
+                <rect x="510" y="90"  width="195" height="45" class="d-fill-panel"/><rect x="510" y="90" width="195" height="45" fill="#45e4d1" opacity="0.55"/>
+                <rect x="510" y="135" width="195" height="15" class="d-fill-panel"/>
+                <rect x="510" y="150" width="195" height="20" fill="#a884ff" opacity="0.8"/>
+                <rect x="510" y="170" width="195" height="9"  fill="#ff5f9e" opacity="0.85"/>
+                <rect x="510" y="179" width="195" height="6"  fill="#45e4d1" opacity="0.8"/>
+                <rect x="510" y="185" width="195" height="47" class="d-fill-panel"/>
+                <rect x="510" y="232" width="195" height="14" fill="#ffb14e" opacity="0.5"/>
+                <rect x="510" y="246" width="195" height="18" fill="#ffb14e" opacity="0.85"/>
+                <rect x="510" y="264" width="195" height="18" fill="#a884ff" opacity="0.6"/>
+                <rect x="510" y="282" width="195" height="48" class="d-fill-panel"/>
+                <rect x="510" y="330" width="195" height="230" fill="#5fd18b" opacity="0.75"/>
+                <text x="607" y="425" text-anchor="middle" class="d-num" style="font-size:11px">FastROM mirror</text>
+                <text x="607" y="442" text-anchor="middle" class="d-sub" style="font-size:9.5px">same map as $00–$3F,</text>
+                <text x="607" y="456" text-anchor="middle" class="d-sub" style="font-size:9.5px">ROM readable at 6 cycles</text>
+              </g>
+
+              <!-- cart banks $C0–$FF -->
+              <rect x="705" y="90" width="195" height="470" fill="#5fd18b" opacity="0.35"/>
+              <text x="802" y="320" text-anchor="middle" class="d-num" style="font-size:11px">cartridge</text>
+              <text x="802" y="337" text-anchor="middle" class="d-sub" style="font-size:9.5px">$C0–$FF · mapper-dependent</text>
+
+              <!-- frame -->
+              <rect x="120" y="90" width="780" height="470" fill="none" class="d-stroke-line" stroke-width="1.5"/>
+              <line x1="315" y1="90" x2="315" y2="560" class="d-axis" stroke-width="1"/>
+              <line x1="504" y1="90" x2="504" y2="560" class="d-axis" stroke-width="1"/>
+              <line x1="510" y1="90" x2="510" y2="560" class="d-axis" stroke-width="1"/>
+              <line x1="705" y1="90" x2="705" y2="560" class="d-axis" stroke-width="1"/>
+
+              <!-- legend -->
+              <rect x="40"  y="596" width="14" height="14" rx="3" fill="#45e4d1"/><text x="62" y="607" class="d-sub">WRAM $7E–$7F · its low-8KB mirror · $2180 port</text>
+              <rect x="380" y="596" width="14" height="14" rx="3" fill="#a884ff"/><text x="402" y="607" class="d-sub">PPU ($21xx) &amp; DMA ($43xx) registers</text>
+              <rect x="680" y="596" width="14" height="14" rx="3" fill="#ff5f9e"/><text x="702" y="607" class="d-sub">APU ports $2140–$217F</text>
+              <rect x="40"  y="624" width="14" height="14" rx="3" fill="#ffb14e"/><text x="62" y="635" class="d-sub">CPU registers &amp; joypad I/O ($40xx–$42xx)</text>
+              <rect x="380" y="624" width="14" height="14" rx="3" fill="#5fd18b"/><text x="402" y="635" class="d-sub">cartridge ROM / SRAM</text>
+              <rect x="680" y="624" width="14" height="14" rx="3" class="d-fill-panel d-stroke-line" stroke-width="1"/><text x="702" y="635" class="d-sub">unmapped — open bus (Mod 14)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The poster to keep.</strong> Banks run left to right, the 64 KB inside each bank runs top to bottom. The &ldquo;system&rdquo; banks $00–$3F all share one layout — WRAM mirror at the bottom, the $21xx and $4xxx register bands, a LoROM cartridge half on top — and banks $80–$BF repeat it as the <span class="term" data-tip="The mirror of the system banks at $80–$BF. Identical contents, but cartridge ROM there can be read at the fast 6-cycle rate if the game enables FastROM.">FastROM mirror</span>. The skinny cyan stripe is all 128 KB of real WRAM ($7E–$7F); register bands are drawn far thicker than true scale (the $21xx band is 256 bytes of a 65,536-byte bank).</figcaption>
+          </figure>
 
           <p>
             The lab is a live map probe. Type any 24-bit address — or hit a preset
@@ -1246,9 +1688,15 @@
             load, store — is painfully slow, and V-blank is short. So the 5A22
             includes a
             <span class="term" data-tip="Direct Memory Access — a hardware engine that copies a block of memory by itself, without the CPU executing load/store instructions for each byte. The SNES has eight DMA channels.">DMA</span>
-            controller: eight channels that copy a block of memory from anywhere
-            (the &ldquo;A-bus&rdquo; source) to a fixed hardware port (the
-            &ldquo;B-bus&rdquo; destination) at roughly one byte per bus cycle.
+            controller: eight channels that copy a block of memory into a
+            hardware port at a fixed cost of <strong>8 master cycles per
+            byte</strong>. The two ends of the copy live on different buses.
+            The source side rides the <strong>A-bus</strong> — the CPU's
+            ordinary 24-bit address bus, the one that reaches WRAM and
+            cartridge ROM. The destination is on the <strong>B-bus</strong> — a
+            small 8-bit side bus that carries only the <code>$21xx</code>
+            register ports (VRAM, palette, sprite memory and friends), which is
+            why a DMA destination is named by a single port byte.
           </p>
           <p>
             You set a channel up by writing its registers at
@@ -1263,14 +1711,19 @@
             alternating two (mode 1, perfect for the low/high VRAM pair), and so on.
           </p>
           <p>
-            The price is right there in the name of the enable register:
-            <strong>while a DMA runs, the CPU is halted</strong>. The DMA engine
-            owns the bus; the processor simply stops until the transfer completes.
-            That's fine — DMA moves data at about <strong>2.68&nbsp;MB/s</strong>,
-            roughly 8 master cycles per byte, so even a big transfer fits inside
-            V-blank, and the CPU wasn't going to do anything useful mid-blank
-            anyway. It's a deliberate trade: pause the thinker so the mover can go
-            flat out.
+            The price: <strong>while a DMA runs, the CPU is halted</strong>. The
+            DMA engine owns the bus; the processor simply stops until the
+            transfer completes. And at 8 master cycles per byte
+            (≈&nbsp;2.68&nbsp;MB/s), the budget is tighter than you'd hope. An
+            NTSC V-blank is only about 38 scanlines — roughly 52,000 master
+            cycles — which is room for just <strong>5–6&nbsp;KB</strong> of DMA
+            before the beam starts drawing again. Filling all 64 KB of VRAM
+            costs about 524,000 cycles — nearly a frame and a half. So real
+            games budget: they split big uploads across several V-blanks, or
+            switch the display off entirely (<em>forced blank</em>) during
+            loading screens and transfer at leisure while nothing is drawn.
+            It's a deliberate trade — pause the thinker so the mover can go
+            flat out — but only for as long as the blank lasts.
           </p>
 
           <div class="analogy">
@@ -1284,6 +1737,56 @@
               blink.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 330" role="img" aria-label="During DMA the CPU is parked off the bus while the DMA engine bridges the A-bus (WRAM and ROM) to the B-bus row of $21xx ports">
+              <defs><marker id="fg10a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg10c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker></defs>
+              <text x="40" y="30" class="d-tag">One transfer, two buses — and a parked CPU</text>
+
+              <!-- A-bus sources -->
+              <rect x="40" y="66" width="150" height="52" rx="8" class="d-fill-panel2 d-cyan-s" stroke-width="1.4"/>
+              <text x="115" y="88" text-anchor="middle" class="d-num">WRAM</text>
+              <text x="115" y="105" text-anchor="middle" class="d-sub">$7E–$7F</text>
+              <rect x="40" y="134" width="150" height="52" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="115" y="156" text-anchor="middle" class="d-num">cart ROM</text>
+              <text x="115" y="173" text-anchor="middle" class="d-sub">tiles · maps · music</text>
+
+              <!-- A-bus rail -->
+              <line x1="250" y1="56" x2="250" y2="240" stroke="#45e4d1" stroke-width="3" opacity="0.7"/>
+              <text x="250" y="262" text-anchor="middle" class="d-flow d-cyan">A-bus · 24-bit · memory side</text>
+              <line x1="190" y1="92" x2="246" y2="92" class="d-axis" stroke-width="1.6" marker-end="url(#fg10a)"/>
+              <line x1="190" y1="160" x2="246" y2="160" class="d-axis" stroke-width="1.6" marker-end="url(#fg10a)"/>
+
+              <!-- DMA engine -->
+              <rect x="330" y="88" width="220" height="90" rx="12" class="d-fill-panel d-violet-s" stroke-width="1.8"/>
+              <text x="440" y="122" text-anchor="middle" class="d-label" style="font-size:13px">DMA channel</text>
+              <text x="440" y="142" text-anchor="middle" class="d-sub">reads A-bus · writes B-bus</text>
+              <text x="440" y="158" text-anchor="middle" class="d-sub">8 master cycles per byte</text>
+              <line x1="254" y1="133" x2="326" y2="133" stroke="#45e4d1" stroke-width="2" marker-end="url(#fg10c)"/>
+
+              <!-- B-bus rail -->
+              <line x1="630" y1="56" x2="630" y2="240" stroke="#a884ff" stroke-width="3" opacity="0.7"/>
+              <text x="630" y="262" text-anchor="middle" class="d-flow d-violet">B-bus · 8-bit · $21xx ports only</text>
+              <line x1="554" y1="133" x2="626" y2="133" stroke="#a884ff" stroke-width="2" marker-end="url(#fg10a)"/>
+
+              <!-- port row -->
+              <rect x="700" y="56"  width="200" height="36" rx="6" class="d-cell"/><text x="714" y="79" class="d-num" style="font-size:11px">$2104 · OAM (sprites)</text>
+              <rect x="700" y="100" width="200" height="36" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.5"/><text x="714" y="123" class="d-num" style="font-size:11px">$2118/$2119 · VRAM</text>
+              <rect x="700" y="144" width="200" height="36" rx="6" class="d-cell"/><text x="714" y="167" class="d-num" style="font-size:11px">$2122 · CGRAM (palette)</text>
+              <rect x="700" y="188" width="200" height="36" rx="6" class="d-cell"/><text x="714" y="211" class="d-num" style="font-size:11px">$2132 · fixed colour</text>
+              <line x1="634" y1="118" x2="696" y2="118" stroke="#a884ff" stroke-width="2" marker-end="url(#fg10a)"/>
+
+              <!-- parked CPU -->
+              <rect x="330" y="220" width="220" height="52" rx="10" class="d-fill-panel2 d-red-s" stroke-width="1.4" stroke-dasharray="6 4" opacity="0.85"/>
+              <text x="440" y="242" text-anchor="middle" class="d-num d-red">CPU — halted</text>
+              <text x="440" y="259" text-anchor="middle" class="d-sub">parked off the bus until the copy ends</text>
+              <line x1="330" y1="246" x2="262" y2="220" class="d-axis" stroke-width="1.4" stroke-dasharray="3 3"/>
+              <text x="268" y="212" class="d-flow d-red">✕ no access</text>
+
+              <text x="40" y="306" class="d-sub">arm with one write to $420B (MDMAEN) → the engine streams source → port, byte after byte, until the count runs out</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Why the CPU must stop.</strong> There is one <span class="term" data-tip="The CPU's ordinary 24-bit address bus, reaching WRAM, cartridge ROM and the rest of the memory map — the source side of a DMA.">A-bus</span> and the DMA engine needs it, so the processor is parked while the engine bridges memory onto the <span class="term" data-tip="The narrow 8-bit bus carrying the $2100–$21FF ports (PPU, APU mailboxes, WRAM port) — the destination side of a DMA.">B-bus</span> port row. Mode 1 alternates two adjacent ports — perfect for VRAM's low/high pair.</figcaption>
+          </figure>
 
           <p>
             The lab is a channel you configure and fire. Pick a destination port
@@ -1333,12 +1836,13 @@
               <li>DMA is a hardware copy engine — eight channels that move blocks from memory to a fixed hardware port.</li>
               <li>Configure a channel at $43x0–$43x6, then arm it with a bit in $420B (MDMAEN); the transfer fires at once.</li>
               <li>Transfer patterns fan bytes across destination ports — mode 1 feeds the $2118/$2119 VRAM pair.</li>
-              <li>DMA runs at ~2.68 MB/s (≈ 8 master cycles/byte) and halts the CPU for its duration — a deliberate trade.</li>
+              <li>DMA costs 8 master cycles per byte (≈ 2.68 MB/s) and halts the CPU for its duration — a deliberate trade.</li>
+              <li>One NTSC V-blank (~38 lines ≈ 52k master cycles) fits only ~5–6 KB of DMA — big loads span frames or run under forced blank.</li>
             </ul>
           </div>
 
           <div class="mod-nav">
-            <a href="#banks"><span class="dir">← Prev</span><span class="ttl">09 · The 24-bit address space</span></a>
+            <a href="#banks"><span class="dir">← Prev</span><span class="ttl">09 · The 24-bit address space &amp; banks</span></a>
             <a class="next" href="#hdma"><span class="dir">Next →</span><span class="ttl">11 · HDMA — mid-frame magic</span></a>
           </div>
         </div>
@@ -1366,12 +1870,25 @@
             You arm HDMA channels by writing <strong><code>$420C</code></strong>
             (HDMAEN) instead of $420B, and each channel reads from a
             <span class="term" data-tip="A small table in memory that HDMA walks one entry per scanline group. Each entry starts with a line-count byte (how many lines it applies to) followed by the data to write — or, in indirect mode, a pointer to that data.">table</span>
-            in memory. The table format is compact: a <strong>line-count byte</strong>
-            says how many scanlines this entry covers, followed by the data to
-            write to the target register — or, in <strong>indirect</strong> mode, a
-            pointer to that data. A line-count byte of <code>$00</code> ends the
-            table. The CPU sets the table up once; the HDMA hardware then walks it
-            automatically, line by line, all frame, for free.
+            in memory. The table format is compact: each entry starts with a
+            <strong>line-count byte</strong>, followed by the data to write to
+            the target register — or, in <strong>indirect</strong> mode, a
+            pointer to that data. The count byte does double duty via its top
+            bit. Values <strong>$01–$80</strong> mean <em>hold</em>: write the
+            data once, then keep it for 1–128 lines. Values
+            <strong>$81–$FF</strong> switch on
+            <span class="term" data-tip="A line-count byte with the top bit set ($81–$FF). Instead of writing once and holding, the channel writes fresh data on EVERY line, for (count &amp; $7F) lines — the key to smooth per-line gradients.">repeat mode</span>:
+            write <em>fresh</em> data on <strong>every</strong> line, for
+            (count&nbsp;&amp;&nbsp;<code>$7F</code>) lines. And <code>$00</code>
+            ends the table. A concrete table, in real bytes — say we're feeding
+            the fixed-colour register: <code>$20&nbsp;$48</code> (hold: write
+            $48 once, keep it 32 lines) · <code>$83&nbsp;$50&nbsp;$58&nbsp;$60</code>
+            (repeat: 3 lines, each getting its own value) ·
+            <code>$20&nbsp;$00</code> (hold $00 for 32 lines) · <code>$00</code>
+            (end). The CPU sets the table up once; the HDMA hardware then walks
+            it with no CPU instructions at all — though not quite for free: each
+            active channel steals a few machine cycles from the CPU every
+            scanline it writes (Module 14 counts the cost).
           </p>
           <p>
             What can you paint with a register that changes every line? A colour
@@ -1397,12 +1914,71 @@
             </p>
           </div>
 
+          <figure class="figure">
+            <svg viewBox="0 0 940 440" role="img" aria-label="Left: the anatomy of one frame with scanlines, H-blank slivers and the V-blank band. Right: an HDMA table whose entries — including a repeat-mode entry — are connected by arrows to the groups of scanlines they govern">
+              <defs><marker id="fg11a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg11m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ff5f9e"/></marker></defs>
+              <text x="40" y="30" class="d-tag">A frame, and the table that paints down it</text>
+
+              <!-- frame -->
+              <rect x="40" y="56" width="330" height="280" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <!-- scanline hairlines -->
+              <g stroke="#2c2542" stroke-width="1">
+                <line x1="44" y1="76" x2="340" y2="76"/><line x1="44" y1="96" x2="340" y2="96"/><line x1="44" y1="116" x2="340" y2="116"/><line x1="44" y1="136" x2="340" y2="136"/><line x1="44" y1="156" x2="340" y2="156"/><line x1="44" y1="176" x2="340" y2="176"/><line x1="44" y1="196" x2="340" y2="196"/><line x1="44" y1="216" x2="340" y2="216"/><line x1="44" y1="236" x2="340" y2="236"/><line x1="44" y1="256" x2="340" y2="256"/>
+              </g>
+              <!-- H-blank sliver -->
+              <rect x="340" y="56" width="30" height="224" fill="#ffb14e" opacity="0.28"/>
+              <text x="355" y="150" text-anchor="middle" class="d-flow d-amber" transform="rotate(90 355 150)">H-blank — HDMA writes land here</text>
+              <!-- V-blank band -->
+              <rect x="40" y="280" width="330" height="56" fill="#a884ff" opacity="0.22"/>
+              <text x="205" y="312" text-anchor="middle" class="d-sub d-violet">V-blank · lines 225–261 — HDMA tables re-arm for the next frame</text>
+              <text x="48" y="352" class="d-sub">visible lines 0–224 · beam sweeps left → right, top → bottom</text>
+
+              <!-- line-group brackets -->
+              <rect x="40" y="56" width="300" height="88" fill="#45e4d1" opacity="0.10"/>
+              <rect x="40" y="144" width="300" height="24" fill="#ff5f9e" opacity="0.18"/>
+              <rect x="40" y="168" width="300" height="88" fill="#0c0a13" opacity="0.35"/>
+              <text x="52" y="104" class="d-flow d-cyan">lines 0–31 · one colour, held</text>
+              <text x="52" y="160" class="d-flow d-magenta">lines 32–34 · fresh colour EVERY line</text>
+              <text x="52" y="216" class="d-flow">lines 35–66 · $00, held</text>
+
+              <!-- table -->
+              <text x="560" y="66" class="d-sub">the HDMA table in memory — real bytes</text>
+              <rect x="560" y="76" width="88" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="604" y="101" text-anchor="middle" class="d-num">$20</text>
+              <rect x="652" y="76" width="88" height="40" rx="6" class="d-cell"/><text x="696" y="101" text-anchor="middle" class="d-num">$48</text>
+              <text x="750" y="101" class="d-sub">hold: write once, keep 32 lines</text>
+
+              <rect x="560" y="132" width="88" height="40" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.6"/><text x="604" y="157" text-anchor="middle" class="d-num">$83</text>
+              <rect x="652" y="132" width="60" height="40" rx="6" class="d-cell"/><text x="682" y="157" text-anchor="middle" class="d-num">$50</text>
+              <rect x="716" y="132" width="60" height="40" rx="6" class="d-cell"/><text x="746" y="157" text-anchor="middle" class="d-num">$58</text>
+              <rect x="780" y="132" width="60" height="40" rx="6" class="d-cell"/><text x="810" y="157" text-anchor="middle" class="d-num">$60</text>
+              <text x="560" y="192" class="d-sub">$83 = $80 repeat bit + 3 → three lines, one value each</text>
+
+              <rect x="560" y="212" width="88" height="40" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/><text x="604" y="237" text-anchor="middle" class="d-num">$20</text>
+              <rect x="652" y="212" width="88" height="40" rx="6" class="d-cell"/><text x="696" y="237" text-anchor="middle" class="d-num">$00</text>
+              <text x="750" y="237" class="d-sub">hold $00 for 32 lines</text>
+
+              <rect x="560" y="268" width="88" height="40" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.4"/><text x="604" y="293" text-anchor="middle" class="d-num">$00</text>
+              <text x="660" y="293" class="d-sub">line count 0 → end of table</text>
+
+              <!-- arrows table → line groups -->
+              <path d="M 556 96 C 460 96, 420 96, 376 96" fill="none" stroke="#45e4d1" stroke-width="1.6" marker-end="url(#fg11a)"/>
+              <path d="M 556 152 C 460 152, 430 156, 376 156" fill="none" stroke="#ff5f9e" stroke-width="1.8" marker-end="url(#fg11m)"/>
+              <path d="M 556 232 C 460 232, 430 214, 376 210" fill="none" stroke="#877f9e" stroke-width="1.6" marker-end="url(#fg11a)"/>
+
+              <text x="40" y="404" class="d-sub">each entry governs a group of scanlines; the repeat-bit entry ($83) delivers a different byte on each of its lines</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Table on the right, screen on the left.</strong> Hold entries (<code>$20 $48</code>) set a value and coast; the <span class="term" data-tip="A line-count byte with the top bit set ($81–$FF): the channel writes fresh data on every one of its (count &amp; $7F) lines instead of writing once and holding.">repeat-mode</span> entry (<code>$83 …</code>) hands the register a fresh byte on every one of its lines. Every write is squeezed into the H-blank sliver at the end of a scanline; the whole dance resets during V-blank.</figcaption>
+          </figure>
+
           <p>
             The lab is HDMA painting a sky. It writes the fixed-colour register
             <code>$2132</code> a new value on each scanline, interpolating between a
             top and bottom colour you pick — and animates the beam filling the
-            gradient line by line, exactly as the hardware would. The table on the
-            side shows the line-count/value entries the CPU would set up once.
+            gradient line by line, exactly as the hardware would. The table on
+            the side shows the entries a gradient this smooth really needs:
+            <strong>repeat-mode</strong> counts (top bit set) followed by one
+            colour byte per line — a hold-mode table would paint bands, not a
+            fade.
           </p>
 
           <div class="lab" id="lab-hdma">
@@ -1435,9 +2011,9 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li>HDMA does a small transfer every scanline, in H-blank, so a register can change value down the screen.</li>
-              <li>Channels are armed by $420C (HDMAEN) and driven by a table: a line-count byte plus data, or a pointer (indirect).</li>
+              <li>Channels are armed by $420C (HDMAEN) and driven by a table: a line-count byte ($01–$80 = hold; $81–$FF = repeat, fresh data every line) plus data, or a pointer (indirect).</li>
               <li>It powers gradients, per-line scroll and parallax, per-line Mode 7 matrices, and window shapes.</li>
-              <li>The CPU builds the table once; the hardware walks it automatically all frame, for free.</li>
+              <li>The CPU builds the table once; the hardware walks it all frame with no CPU instructions — at the price of a few stolen cycles per active line (Module 14).</li>
             </ul>
           </div>
 
@@ -1471,13 +2047,20 @@
             <strong>Multiply</strong> is unsigned 8×8→16. Write the first operand to
             <code>$4202</code> and the second to <code>$4203</code>; writing
             <code>$4203</code> starts the calculation. After <strong>8 CPU
-            cycles</strong> the 16-bit product is waiting in
+            cycles</strong> — machine cycles of the CPU, note, not master-clock
+            ticks — the 16-bit product is waiting in
             <code>$4216</code> (low) and <code>$4217</code> (high).
             <strong>Divide</strong> is unsigned 16÷8. Write the 16-bit dividend to
             <code>$4204/$4205</code> and the 8-bit divisor to <code>$4206</code>;
             writing <code>$4206</code> starts it. After <strong>16 cycles</strong>
             the quotient sits in <code>$4214/$4215</code> and the remainder in
-            <code>$4216/$4217</code>.
+            <code>$4216/$4217</code>. The counts aren't arbitrary: the unit is a
+            shift-and-add machine that grinds out <em>one bit of the answer per
+            cycle</em> — 8 cycles for an 8-bit multiplier, 16 for a 16-bit
+            quotient. Even division by zero is defined rather than fatal: the
+            quotient comes back <code>$FFFF</code> and the remainder is the
+            dividend, passed through untouched — the lab reproduces exactly
+            that.
           </p>
           <p>
             That <em>wait</em> is the crucial detail. The unit isn't instantaneous —
@@ -1500,6 +2083,46 @@
               tray early gets you nothing useful.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 320" role="img" aria-label="The four result registers $4214 to $4217 drawn once, with the divide quotient and remainder above and the multiply product below sharing $4216 and $4217, plus a write, wait, read timeline">
+              <defs><marker id="fg12a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="40" y="30" class="d-tag">Four registers, two meanings — the result wires are shared</text>
+
+              <!-- divide brackets (above) -->
+              <text x="330" y="72" text-anchor="middle" class="d-sub d-violet">divide · quotient lo/hi</text>
+              <path d="M 190 96 L 190 82 L 470 82 L 470 96" fill="none" stroke="#a884ff" stroke-width="1.6"/>
+              <text x="620" y="72" text-anchor="middle" class="d-sub d-violet">divide · remainder lo/hi</text>
+              <path d="M 480 96 L 480 82 L 760 82 L 760 96" fill="none" stroke="#a884ff" stroke-width="1.6"/>
+
+              <!-- register cells -->
+              <rect x="190" y="100" width="135" height="52" rx="8" class="d-cell"/><text x="257" y="124" text-anchor="middle" class="d-num">$4214</text><text x="257" y="141" text-anchor="middle" class="d-sub">RDDIVL</text>
+              <rect x="335" y="100" width="135" height="52" rx="8" class="d-cell"/><text x="402" y="124" text-anchor="middle" class="d-num">$4215</text><text x="402" y="141" text-anchor="middle" class="d-sub">RDDIVH</text>
+              <rect x="480" y="100" width="135" height="52" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.5"/><text x="547" y="124" text-anchor="middle" class="d-num">$4216</text><text x="547" y="141" text-anchor="middle" class="d-sub">RDMPYL</text>
+              <rect x="625" y="100" width="135" height="52" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.5"/><text x="692" y="124" text-anchor="middle" class="d-num">$4217</text><text x="692" y="141" text-anchor="middle" class="d-sub">RDMPYH</text>
+
+              <!-- multiply bracket (below) -->
+              <path d="M 480 156 L 480 170 L 760 170 L 760 156" fill="none" stroke="#45e4d1" stroke-width="1.6"/>
+              <text x="620" y="188" text-anchor="middle" class="d-sub d-cyan">multiply · 16-bit product lo/hi — same two registers</text>
+              <text x="330" y="188" text-anchor="middle" class="d-sub">multiply leaves $4214/5 alone</text>
+
+              <!-- timeline -->
+              <text x="40" y="232" class="d-sub">the ritual, in time:</text>
+              <rect x="150" y="216" width="170" height="40" rx="7" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="235" y="241" text-anchor="middle" class="d-sub">write $4203 (or $4206)</text>
+              <line x1="320" y1="236" x2="420" y2="236" class="d-axis" stroke-width="1.6" marker-end="url(#fg12a)"/>
+              <rect x="424" y="216" width="210" height="40" rx="7" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="529" y="235" text-anchor="middle" class="d-sub">whir: 8 / 16 CPU cycles</text>
+              <text x="529" y="249" text-anchor="middle" class="d-sub">one answer bit per cycle</text>
+              <line x1="634" y1="236" x2="724" y2="236" class="d-axis" stroke-width="1.6" marker-end="url(#fg12a)"/>
+              <rect x="728" y="216" width="172" height="40" rx="7" class="d-fill-panel2 d-cyan-s" stroke-width="1.4"/>
+              <text x="814" y="241" text-anchor="middle" class="d-sub">read $4216/7 (·$4214/5)</text>
+              <line x1="529" y1="212" x2="529" y2="196" stroke="#ff6a6a" stroke-width="1.8"/>
+              <text x="529" y="286" text-anchor="middle" class="d-flow d-red">read here, mid-whir → half-finished bits</text>
+              <line x1="529" y1="276" x2="529" y2="260" stroke="#ff6a6a" stroke-width="1.8" marker-end="url(#fg12a)"/>
+            </svg>
+            <figcaption class="fig-cap"><strong>Why product and remainder collide.</strong> <code>$4216/$4217</code> is one pair of registers with two jobs: multiply parks its product there, divide its remainder. Start a divide and the last product is gone. The bottom strip is the ritual the vending-machine analogy describes — and the red mark is the classic too-early read.</figcaption>
+          </figure>
 
           <p>
             The lab is the math unit with its wait modelled. Choose multiply or
@@ -1637,6 +2260,49 @@
             </p>
           </div>
 
+          <figure class="figure">
+            <svg viewBox="0 0 940 420" role="img" aria-label="Two emulation strategies against one master-clock ruler: cycle-stepping interleaves CPU and PPU in small slices so a mid-instruction write lands at the right clock; instruction-stepping runs a whole instruction then catches the PPU up in a lump, so the same write lands late, marked in red">
+              <defs><marker id="fg13a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg13r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ff6a6a"/></marker></defs>
+              <text x="40" y="28" class="d-tag">Same instruction, two models of time</text>
+
+              <!-- master clock ruler -->
+              <line x1="120" y1="56" x2="900" y2="56" class="d-axis" stroke-width="1.5"/>
+              <g stroke="#877f9e" stroke-width="1.3">
+                <line x1="120" y1="50" x2="120" y2="62"/><line x1="159" y1="50" x2="159" y2="62"/><line x1="198" y1="50" x2="198" y2="62"/><line x1="237" y1="50" x2="237" y2="62"/><line x1="276" y1="50" x2="276" y2="62"/><line x1="315" y1="50" x2="315" y2="62"/><line x1="354" y1="50" x2="354" y2="62"/><line x1="393" y1="50" x2="393" y2="62"/><line x1="432" y1="50" x2="432" y2="62"/><line x1="471" y1="50" x2="471" y2="62"/><line x1="510" y1="50" x2="510" y2="62"/><line x1="549" y1="50" x2="549" y2="62"/><line x1="588" y1="50" x2="588" y2="62"/><line x1="627" y1="50" x2="627" y2="62"/><line x1="666" y1="50" x2="666" y2="62"/><line x1="705" y1="50" x2="705" y2="62"/><line x1="744" y1="50" x2="744" y2="62"/><line x1="783" y1="50" x2="783" y2="62"/><line x1="822" y1="50" x2="822" y2="62"/><line x1="861" y1="50" x2="861" y2="62"/><line x1="900" y1="50" x2="900" y2="62"/>
+              </g>
+              <text x="40" y="60" class="d-sub">master clock</text>
+
+              <!-- cycle-stepped -->
+              <text x="40" y="102" class="d-sub d-cyan">bsnes · cycle-stepped</text>
+              <text x="106" y="130" text-anchor="end" class="d-sub">CPU</text>
+              <rect x="120" y="114" width="78" height="26" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <rect x="198" y="114" width="78" height="26" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <rect x="276" y="114" width="78" height="26" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <rect x="354" y="114" width="78" height="26" rx="5" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <text x="106" y="166" text-anchor="end" class="d-sub">PPU</text>
+              <rect x="120" y="150" width="78" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/>
+              <rect x="198" y="150" width="78" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/>
+              <rect x="276" y="150" width="78" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/>
+              <rect x="354" y="150" width="78" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.3"/>
+              <line x1="296" y1="108" x2="296" y2="182" stroke="#5fd18b" stroke-width="2"/>
+              <text x="306" y="196" class="d-flow" style="fill:#5fd18b">mid-instruction write → the PPU sees it on this exact clock ✓</text>
+              <text x="460" y="130" class="d-sub">…both advance a few clocks at a time, forever in step</text>
+
+              <!-- instruction-stepped -->
+              <text x="40" y="250" class="d-sub d-amber">older emulators · instruction-stepped</text>
+              <text x="106" y="278" text-anchor="end" class="d-sub">CPU</text>
+              <rect x="120" y="262" width="312" height="26" rx="5" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <text x="276" y="279" text-anchor="middle" class="d-sub">one whole instruction, run in one go</text>
+              <text x="106" y="326" text-anchor="end" class="d-sub">PPU</text>
+              <rect x="432" y="310" width="312" height="26" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="588" y="327" text-anchor="middle" class="d-sub">catch-up lump — replays the same span afterwards</text>
+              <line x1="296" y1="256" x2="296" y2="294" stroke="#ff6a6a" stroke-width="2"/>
+              <path d="M 296 294 C 296 330, 380 322, 428 322" fill="none" stroke="#ff6a6a" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#fg13r)"/>
+              <text x="120" y="376" class="d-flow d-red">the same write happens here… but the PPU only learns about it later, at the lump — time has smeared ✗</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Where accuracy lives.</strong> Top: the shared-clock scheduler slides CPU and PPU forward in tiny alternating slices, so a store that lands mid-instruction reaches the PPU on the true master cycle. Bottom: instruction-stepping finishes the whole instruction first, then replays the PPU in a lump — the write arrives late, and any game timing an effect against the beam sees the smear.</figcaption>
+          </figure>
+
           <div class="note hw">
             <div class="ico">⌁</div>
             <div><p><strong>Look back at the toy CPU (Module 01).</strong> An
@@ -1669,7 +2335,7 @@
         <div class="mod-head">
           <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
           <h3>The accuracy traps</h3>
-          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the places where a fast SNES emulator and a truthful one pull apart: open bus, DMA/HDMA timing, the H/V counters, early IRQs, and the notorious CPU↔APU boot sync.</span></div>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the places where a fast SNES emulator and a truthful one pull apart: open bus, DMA/HDMA timing, the H/V timer and early IRQs, the notorious CPU↔APU boot sync, and self-modifying code.</span></div>
         </div>
         <div class="prose">
           <p>
@@ -1705,15 +2371,23 @@
             an effect against the beam — drifts out of sync.
           </p>
 
-          <h4>Trap 3 · The H/V counters and the &ldquo;early IRQ&rdquo;</h4>
+          <h4>Trap 3 · The H/V timer and the &ldquo;early IRQ&rdquo;</h4>
           <p>
-            The PPU exposes <strong>horizontal and vertical counters</strong> — where
-            the drawing beam is right now — and the CPU can latch and read them, and
-            program an IRQ to fire at a chosen beam position. The exact relationship
-            between the CPU's clock and those counters is delicate, and there's a
-            famous class of bug where an
-            <span class="term" data-tip="A well-known SNES emulation subtlety: a beam-position IRQ that fires one CPU cycle earlier (or later) than the hardware, because the H/V counter-to-CPU timing was modelled imprecisely.">IRQ fires one cycle early</span>
-            because the counter-to-CPU timing was modelled a hair off. One cycle is
+            First, a correction to a widespread misattribution: the beam-chasing
+            hardware lives in the <strong>5A22 itself</strong>, not in the PPU.
+            It's the CPU chip (Module 07's peripheral list) that keeps
+            <strong>horizontal and vertical counters</strong> tracking the beam,
+            and it's the CPU chip you program: write a target position into
+            <code>$4207–$420A</code> and the timer fires an IRQ when the beam
+            gets there, acknowledged by reading <code>$4211</code> (TIMEUP).
+            The PPU's only role is on the <em>reading</em> side: touching
+            <code>$2137</code> <span class="term" data-tip="To latch is to freeze a copy of a changing value into a register at one instant, so software can read it at leisure while the original keeps moving.">latches</span>
+            the counters — freezes a snapshot of the moving beam position — and
+            software then reads that snapshot from <code>$213C/$213D</code>.
+            The exact relationship between the CPU's clock and those counters
+            is delicate, and there's a famous class of bug where an
+            <span class="term" data-tip="A well-known SNES emulation subtlety: a beam-position IRQ that fires one CPU cycle earlier (or later) than the hardware, because the H/V timer-to-CPU timing was modelled imprecisely.">IRQ fires one cycle early</span>
+            because the timer-to-CPU timing was modelled a hair off. One cycle is
             enough to make a raster effect tear or a game hang.
           </p>
 
@@ -1730,6 +2404,65 @@
             correctly related, a small timing error makes the handshake desync — and
             the game hangs on a black screen at boot. Whole eras of emulators fought
             this exact bug.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 940 470" role="img" aria-label="Sequence ladder of the CPU to SPC700 boot handshake over the $2140 and $2141 mailbox ports, with a red fork showing how a timing error desyncs the upload">
+              <defs><marker id="fg14a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="fg14c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker><marker id="fg14m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ff5f9e"/></marker><marker id="fg14r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#ff6a6a"/></marker></defs>
+              <text x="40" y="28" class="d-tag">The boot handshake — two chips, two clocks, one fragile conversation</text>
+
+              <!-- lifeline heads -->
+              <rect x="150" y="48" width="200" height="52" rx="9" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="250" y="70" text-anchor="middle" class="d-num">5A22 CPU</text>
+              <text x="250" y="88" text-anchor="middle" class="d-sub">steps off 21.477 MHz</text>
+              <rect x="600" y="48" width="200" height="52" rx="9" class="d-fill-panel2 d-magenta-s" stroke-width="1.5"/>
+              <text x="700" y="70" text-anchor="middle" class="d-num">SPC700 (APU)</text>
+              <text x="700" y="88" text-anchor="middle" class="d-sub">its own crystal · ~24.576 MHz-derived</text>
+
+              <!-- lifelines -->
+              <line x1="250" y1="100" x2="250" y2="430" class="d-axis" stroke-width="1.6"/>
+              <line x1="700" y1="100" x2="700" y2="430" class="d-axis" stroke-width="1.6"/>
+
+              <!-- messages -->
+              <line x1="694" y1="136" x2="258" y2="136" stroke="#ff5f9e" stroke-width="1.8" marker-end="url(#fg14m)"/>
+              <text x="475" y="128" text-anchor="middle" class="d-flow d-magenta">boot ROM: $2140 ← $AA · $2141 ← $BB — &ldquo;I'm ready&rdquo;</text>
+
+              <line x1="258" y1="180" x2="694" y2="180" stroke="#45e4d1" stroke-width="1.8" marker-end="url(#fg14c)"/>
+              <text x="475" y="172" text-anchor="middle" class="d-flow d-cyan">$CC + destination address — &ldquo;here comes the driver&rdquo;</text>
+
+              <line x1="258" y1="228" x2="694" y2="228" stroke="#45e4d1" stroke-width="1.8" marker-end="url(#fg14c)"/>
+              <text x="475" y="220" text-anchor="middle" class="d-flow d-cyan">data byte via $2141 + index i via $2140</text>
+
+              <line x1="694" y1="272" x2="258" y2="272" stroke="#ff5f9e" stroke-width="1.8" marker-end="url(#fg14m)"/>
+              <text x="475" y="264" text-anchor="middle" class="d-flow d-magenta">echoes i back through $2140 — &ldquo;got byte i&rdquo;</text>
+
+              <rect x="216" y="292" width="520" height="34" rx="7" class="d-fill-panel d-stroke-line" stroke-width="1.2"/>
+              <text x="476" y="314" text-anchor="middle" class="d-sub">↺ repeat for every byte of the sound driver — thousands of round-trips</text>
+
+              <!-- desync fork -->
+              <line x1="258" y1="368" x2="560" y2="392" stroke="#ff6a6a" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#fg14r)"/>
+              <text x="240" y="360" class="d-flow d-red">if the emulator's clock ratio drifts: CPU reads the echo a hair early,</text>
+              <text x="240" y="412" class="d-flow d-red">sees the OLD index, resends — both sides now wait on each other forever → black screen</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>A conversation with no referee.</strong> The upload protocol is pure convention riding on the <code>$2140–$2143</code> mailboxes — each side just polls until the other's byte appears. Get the two clocks' ratio wrong by a whisker and one read lands one cycle early, the echo check fails, and the handshake deadlocks. Only a scheduler that keeps both clocks honestly related (Module 13) survives it.</figcaption>
+          </figure>
+
+          <h4>Trap 5 · Programs and data share memory</h4>
+          <p>
+            Module 01 called this &ldquo;the single most important idea in all
+            of computing&rdquo; and promised it makes emulators sweat. Here's
+            the sweat. Because instructions are just bytes in the same memory
+            as data, nothing stops a program from writing over its <em>own
+            instructions</em> — and SNES games really do it: code copied into
+            WRAM and patched on the fly, loop operands rewritten each frame,
+            <span class="term" data-tip="Code that writes to the memory holding its own instructions, changing what will execute. Legal and common on the SNES; a hazard for any emulator that caches decoded instructions.">self-modifying code</span>
+            of every flavour. A naive interpreter survives this for free — it
+            re-reads memory every fetch. But the moment an emulator gets clever
+            and caches anything derived from those bytes (pre-decoded
+            instructions, translated blocks), it must watch every write and
+            throw away any cached copy the write just invalidated. Miss one
+            store and the emulator cheerfully executes code that no longer
+            exists.
           </p>
 
           <div class="analogy">
@@ -1760,8 +2493,9 @@
             <ul>
               <li>Open bus: unmapped reads return the last value on the bus, and some games depend on it.</li>
               <li>DMA and especially HDMA steal exact cycles at exact times; sloppy timing desyncs cycle-counting games.</li>
-              <li>The H/V beam counters feed IRQs, and mis-timing them by one cycle is a classic, visible bug.</li>
+              <li>The H/V timer lives in the 5A22 ($4207–$420A, $4211); the PPU only latches counters for reading ($2137, $213C/D). Mis-timing the IRQ by one cycle is a classic, visible bug.</li>
               <li>The CPU↔APU (SPC700) boot handshake across separate clocks is the notorious make-or-break sync.</li>
+              <li>Programs can rewrite their own bytes — anything an emulator caches from memory must be invalidated on writes.</li>
             </ul>
           </div>
 
@@ -1783,9 +2517,13 @@
           <p>
             You now have the full picture, so let's make it hands-on. Modern SNES
             emulators ship debuggers that expose every mechanism this course
-            described. <strong>Mesen</strong> (and <strong>bsnes-plus</strong>) give
-            you a full 65816 debugger; both are cycle-accurate enough to trust what
-            they show you. Here's what to open and what you'll recognise:
+            described. <strong>Mesen&nbsp;2</strong> (mesen.ca) gives you the most
+            complete 65816 debugger going; <strong>bsnes</strong>
+            (github.com/bsnes-emu/bsnes) is the reference cycle-accurate core this
+            course leaned on, and its debug-oriented fork
+            <strong>bsnes-plus</strong> adds a similar tool set. All are accurate
+            enough to trust what they show you. Here's what to open and what
+            you'll recognise:
           </p>
           <ul>
             <li><strong>The disassembler &amp; CPU register view</strong> — see A, X, Y, S, the P flags (including <code>M</code> and <code>X</code>), and the PBR/DBR/D bank registers live. Watch the flags flip on a <code>REP</code>/<code>SEP</code> and the disassembly re-length its immediates, exactly as your Module 08 lab did.</li>

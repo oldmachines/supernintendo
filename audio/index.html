@@ -272,7 +272,11 @@
             The sample rate is measured in samples per second, again in hertz. There's
             a hard rule about it, the <span class="term" data-tip="You must sample at more than twice the highest frequency you want to capture, or that frequency folds back as a false lower tone.">Nyquist limit</span>:
             to capture a frequency you must sample <em>more than twice</em> as fast.
-            Sample too slowly and high frequencies don't just vanish — they fold back
+            You've seen this rule with your eyes: in old films a fast-spinning wagon
+            wheel can appear to crawl or even roll backwards, because the camera's
+            frames sample the motion too slowly — the flipbook from Module 01 with too
+            few pages. Sample sound too slowly and high frequencies do the same trick:
+            they don't just vanish — they fold back
             down and reappear as false, lower tones. That folding is called
             <span class="term" data-tip="A false, lower tone created when a frequency above half the sample rate folds back into the audible range.">aliasing</span>,
             and it sounds like a metallic, warbly grunge riding on top of the sound.
@@ -287,10 +291,24 @@
                 gives a ceiling of 16&nbsp;kHz — a touch shy of the ~20&nbsp;kHz limit
                 of young ears, which is part of why the SNES sounds warm and slightly
                 soft rather than crisp and clinical. Individual voices are usually
-                stored far below 32&nbsp;kHz to save precious RAM, then pitched up on
-                the fly (Module 06).
+                <em>stored</em> at rates well below 32&nbsp;kHz to save precious RAM;
+                the chip then reads them out more slowly — a per-voice pitch register
+                set <em>below</em> its neutral value of <code>$1000</code> — so they
+                still sound at their true pitch (Module 06). Raising that register
+                <em>above</em> <code>$1000</code> is what shifts a sound up.
               </p>
             </div>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Aside · What's a &ldquo;bit&rdquo;?</span>
+            <p>
+              A <span class="term" data-tip="The smallest unit of digital information: one switch that is either 0 or 1.">bit</span>
+              is a single 0-or-1 switch. Line up <em>n</em> of them and you can spell
+              2<sup>n</sup> different patterns: 2 bits give 4, 8 bits give 256, 16 bits
+              give 65&nbsp;536. &ldquo;16-bit audio&rdquo; simply means each sample is
+              written down as one of 65&nbsp;536 possible values.
+            </p>
           </div>
 
           <p>
@@ -303,6 +321,47 @@
             the rate to hear aliasing; drop the bits to hear the crunch. The reference
             button plays it back at the SNES's own 32&nbsp;kHz / 16-bit.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="Left: a smooth wave turned into sample-and-hold steps on a quantisation grid. Right: a tone above the Nyquist limit folding back down as an alias.">
+              <!-- left panel: staircase + quantisation grid -->
+              <text x="30" y="30" class="d-tag d-cyan">Sample &amp; hold + quantisation grid</text>
+              <g>
+                <line x1="30" y1="70" x2="430" y2="70" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="90" x2="430" y2="90" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="110" x2="430" y2="110" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="130" x2="430" y2="130" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="150" x2="430" y2="150" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="170" x2="430" y2="170" class="d-grid" stroke-dasharray="3 4"/>
+                <line x1="30" y1="190" x2="430" y2="190" class="d-grid" stroke-dasharray="3 4"/>
+              </g>
+              <polyline class="d-wave-c" points="30,130 60,90 90,70 120,81 150,116 180,158 210,186 240,186 270,157 300,115 330,81 360,70 390,91 420,131"/>
+              <polyline class="d-wave-m" points="30,130 60,130 60,90 90,90 90,70 120,70 120,90 150,90 150,110 180,110 180,150 210,150 210,190 240,190 270,190 270,150 300,150 300,110 330,110 330,90 360,90 360,70 390,70 390,90 420,90"/>
+              <text x="30" y="222" class="d-sub">smooth wave (<tspan class="d-cyan">cyan</tspan>) → held between ticks and snapped to the nearest rung (<tspan class="d-magenta">magenta</tspan>)</text>
+              <text x="30" y="242" class="d-sub">dashed rungs = the only levels this bit depth can write down</text>
+
+              <!-- right panel: aliasing fold-back -->
+              <text x="500" y="30" class="d-tag d-amber">Aliasing — the fold-back</text>
+              <line x1="500" y1="200" x2="860" y2="200" class="d-axis"/>
+              <line x1="680" y1="60" x2="680" y2="200" class="d-grid" stroke-dasharray="4 4"/>
+              <text x="680" y="220" text-anchor="middle" class="d-sub">Nyquist = 16 kHz (fs ÷ 2)</text>
+              <text x="505" y="220" class="d-sub">0</text>
+              <text x="845" y="220" class="d-sub">32 kHz</text>
+              <!-- true tone above Nyquist (dashed) -->
+              <line x1="770" y1="200" x2="770" y2="90" class="d-magenta-s" stroke-width="2.4" stroke-dasharray="5 4"/>
+              <circle cx="770" cy="90" r="4" class="d-magenta"/>
+              <text x="770" y="76" text-anchor="middle" class="d-sub">true tone · 24 kHz</text>
+              <!-- alias (solid) -->
+              <line x1="590" y1="200" x2="590" y2="110" class="d-amber-s" stroke-width="2.6"/>
+              <circle cx="590" cy="110" r="4.5" class="d-amber"/>
+              <text x="590" y="96" text-anchor="middle" class="d-amber" style="font:600 11px/1 var(--mono)">alias · 8 kHz</text>
+              <!-- fold arrow over the Nyquist mirror -->
+              <path d="M 766 88 Q 680 40 600 104" fill="none" class="d-amber-s" stroke-width="1.6" stroke-dasharray="2 3"/>
+              <polygon points="600,104 611,100 606,110" class="d-amber"/>
+              <text x="680" y="52" text-anchor="middle" class="d-sub">reflects off fs ÷ 2</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The two failure modes.</strong> Left: sample-and-hold turns a smooth wave into a staircase, and quantisation snaps each step to the nearest available rung — the snap error is quantisation noise. Right: a 24&nbsp;kHz tone sampled at 32&nbsp;kHz is above the 16&nbsp;kHz Nyquist limit, so it folds back and plays as a false 8&nbsp;kHz tone — aliasing.</figcaption>
+          </figure>
 
           <div class="lab" id="lab-sampling">
             <div class="lab-head"><span class="dot"></span><span class="title">Sampling lab — starve the two knobs</span><span class="badge">Web Audio · live</span></div>
@@ -378,6 +437,49 @@
               different instrument. The mixer below is that recipe card, live.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 240" role="img" aria-label="Harmonic recipe bars for a sawtooth (every harmonic at 1 over n) and a square (odd harmonics only), each next to the waveform they build.">
+              <!-- saw panel -->
+              <text x="30" y="30" class="d-tag d-cyan">Saw — every harmonic, 1/n loud</text>
+              <line x1="40" y1="170" x2="280" y2="170" class="d-axis"/>
+              <g>
+                <rect x="42"  y="70"  width="16" height="100" rx="3" class="d-cyan"/>
+                <rect x="72"  y="120" width="16" height="50"  rx="3" class="d-cyan"/>
+                <rect x="102" y="137" width="16" height="33"  rx="3" class="d-cyan"/>
+                <rect x="132" y="145" width="16" height="25"  rx="3" class="d-cyan"/>
+                <rect x="162" y="150" width="16" height="20"  rx="3" class="d-cyan"/>
+                <rect x="192" y="153" width="16" height="17"  rx="3" class="d-cyan"/>
+                <rect x="222" y="156" width="16" height="14"  rx="3" class="d-cyan"/>
+                <rect x="252" y="158" width="16" height="12"  rx="3" class="d-cyan"/>
+              </g>
+              <g class="d-sub" text-anchor="middle" style="font-size:10px">
+                <text x="50" y="188">1×</text><text x="80" y="188">2×</text><text x="110" y="188">3×</text><text x="140" y="188">4×</text>
+                <text x="170" y="188">5×</text><text x="200" y="188">6×</text><text x="230" y="188">7×</text><text x="260" y="188">8×</text>
+              </g>
+              <text x="330" y="80" class="d-sub">= this waveform</text>
+              <polyline class="d-wave-c" points="310,150 355,95 355,150 400,95 400,150 430,113"/>
+
+              <!-- square panel -->
+              <text x="490" y="30" class="d-tag d-violet">Square — odd harmonics only</text>
+              <line x1="500" y1="170" x2="740" y2="170" class="d-axis"/>
+              <g>
+                <rect x="502" y="70"  width="16" height="100" rx="3" class="d-violet"/>
+                <rect x="562" y="137" width="16" height="33"  rx="3" class="d-violet"/>
+                <rect x="622" y="150" width="16" height="20"  rx="3" class="d-violet"/>
+                <rect x="682" y="156" width="16" height="14"  rx="3" class="d-violet"/>
+              </g>
+              <g class="d-sub" text-anchor="middle" style="font-size:10px">
+                <text x="510" y="188">1×</text><text x="540" y="188">2×</text><text x="570" y="188">3×</text><text x="600" y="188">4×</text>
+                <text x="630" y="188">5×</text><text x="660" y="188">6×</text><text x="690" y="188">7×</text><text x="720" y="188">8×</text>
+              </g>
+              <text x="770" y="80" class="d-sub">= this waveform</text>
+              <polyline class="d-wave-v" points="760,95 800,95 800,150 840,150 840,95 872,95"/>
+
+              <text x="30" y="222" class="d-sub">bar height = how loud that harmonic is · the &ldquo;recipe card&rdquo; on the left bakes the waveform on the right</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Recipe → waveform.</strong> A sawtooth contains <em>every</em> harmonic, the <em>n</em>-th at 1/<em>n</em> the loudness; a square keeps only the odd ones. Same fundamental, different recipe, different shape — and a different sound.</figcaption>
+          </figure>
 
           <p>
             Slide the first eight harmonics up and down and listen to the timbre
@@ -455,8 +557,21 @@
             Reduction — and it's beautifully rigid. Samples are packed into
             <strong>9-byte blocks, each holding exactly 16 samples</strong>. The first
             byte is the <strong>header</strong>; the remaining eight bytes hold sixteen
-            <strong>4-bit signed nibbles</strong>, one per sample.
+            <strong>4-bit signed nibbles</strong>, one per sample — each a tiny signed
+            value spanning just <strong>−8…+7</strong>.
           </p>
+
+          <div class="analogy">
+            <span class="lbl">Aside · Reading hexadecimal</span>
+            <p>
+              From here on you'll see numbers like <code>$C5</code>. The
+              <code>$</code> marks <span class="term" data-tip="Base-16 notation: digits 0–9 then A–F (worth 10–15). One hex digit = exactly four bits.">hexadecimal</span>
+              — base 16, with digits 0–9 and then A–F standing for 10–15. Each hex
+              digit is exactly four bits (one nibble), which is why hardware people
+              love it: a byte is always two hex digits, <code>$00</code>–<code>$FF</code>
+              = 0–255. So <code>$C5</code> = 12&nbsp;×&nbsp;16&nbsp;+&nbsp;5 = <strong>197</strong>.
+            </p>
+          </div>
 
           <figure class="figure">
             <svg viewBox="0 0 900 220" role="img" aria-label="Layout of one 9-byte BRR block">
@@ -504,10 +619,27 @@
             <li><strong>Filters 2 and 3</strong> — use the previous <em>two</em> samples for a stronger prediction, ideal for smooth, tonal material.</li>
           </ul>
           <p>
+            Let's decode one sample by hand, with real numbers. Say the header set
+            <strong>shift&nbsp;=&nbsp;8</strong> and <strong>filter&nbsp;1</strong>,
+            the previous decoded sample came out as <code>1000</code>, and the next
+            nibble is <code>−3</code>. First the scaling,
+            <code>(nibble&nbsp;&lt;&lt;&nbsp;shift)&nbsp;&gt;&gt;&nbsp;1</code>:
+            shift −3 left by 8 places to get −768, then halve it → <strong>−384</strong>.
+            Next the prediction: filter&nbsp;1 contributes about 15⁄16 of the previous
+            sample, ⌊1000&nbsp;×&nbsp;15⁄16⌋ = <strong>937</strong>. Add them:
+            937&nbsp;−&nbsp;384 = <strong>553</strong>. That's the reconstructed
+            16-bit sample — sixteen of those little sums and the block is done.
+          </p>
+          <p>
             Two header flags finish the picture. <strong>END</strong> marks the last
             block of a sample; <strong>LOOP</strong>, when set on that final block,
             tells the hardware to jump back to a loop point instead of going silent
-            (Module 10). The whole scheme lands around a <strong>3.5&nbsp;:&nbsp;1</strong>
+            (Module 10). One subtlety hides there: filters 1–3 lean on samples decoded
+            <em>before</em> the block, so the block at the loop point should use
+            <strong>filter&nbsp;0</strong> (or data crafted so the history matches),
+            otherwise the first pass and every repeat through the loop decode slightly
+            differently and the joint clicks — we'll see the loop machinery in
+            Module 10. The whole scheme lands around a <strong>3.5&nbsp;:&nbsp;1</strong>
             squeeze — 32 bytes of PCM become 9 bytes of BRR.
           </p>
 
@@ -656,7 +788,10 @@
           <p>
             A game can't store a separate recording for every note; there isn't the
             RAM. Instead it stores one sample and plays it back <em>faster</em> for a
-            higher pitch or <em>slower</em> for a lower one. Reading a stored waveform
+            higher pitch or <em>slower</em> for a lower one. You already know this
+            trick from tape decks: run the tape fast and a voice turns squeaky and
+            chipmunk-like; run it slow and it drops to a growl. Changing a recording's
+            playback speed changes its pitch. Reading a stored waveform
             at a new speed is called <span class="term" data-tip="Reading a stored sample at a new rate to change its pitch.">resampling</span>,
             and it's the beating heart of a sample-based sound chip.
           </p>
@@ -670,11 +805,45 @@
             <strong>Linear</strong> interpolation draws a straight line between the two
             neighbours — better, but corners in the signal still add grit.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 240" role="img" aria-label="Stored samples as dots on a line, with the read head stopped between samples 4 and 5 at position 4.63, where a value must be invented.">
+              <text x="30" y="30" class="d-tag d-cyan">The read head lands between samples</text>
+              <line x1="40" y1="120" x2="880" y2="120" class="d-grid"/>
+              <!-- stored samples -->
+              <g>
+                <line x1="60"  y1="120" x2="60"  y2="113" class="d-stem"/><circle cx="60"  cy="113" r="5" class="d-dot-v"/>
+                <line x1="150" y1="120" x2="150" y2="82"  class="d-stem"/><circle cx="150" cy="82"  r="5" class="d-dot-v"/>
+                <line x1="240" y1="120" x2="240" y2="57"  class="d-stem"/><circle cx="240" cy="57"  r="5" class="d-dot-v"/>
+                <line x1="330" y1="120" x2="330" y2="75"  class="d-stem"/><circle cx="330" cy="75"  r="5" class="d-dot-v"/>
+                <line x1="420" y1="120" x2="420" y2="113" class="d-stem"/><circle cx="420" cy="113" r="5" class="d-dot-v"/>
+                <line x1="510" y1="120" x2="510" y2="155" class="d-stem"/><circle cx="510" cy="155" r="5" class="d-dot-v"/>
+                <line x1="600" y1="120" x2="600" y2="180" class="d-stem"/><circle cx="600" cy="180" r="5" class="d-dot-v"/>
+                <line x1="690" y1="120" x2="690" y2="159" class="d-stem"/><circle cx="690" cy="159" r="5" class="d-dot-v"/>
+                <line x1="780" y1="120" x2="780" y2="120" class="d-stem"/><circle cx="780" cy="120" r="5" class="d-dot-v"/>
+              </g>
+              <g class="d-sub" text-anchor="middle" style="font-size:10px">
+                <text x="60" y="208">0</text><text x="150" y="208">1</text><text x="240" y="208">2</text>
+                <text x="330" y="208">3</text><text x="420" y="208">4</text><text x="510" y="208">5</text>
+                <text x="600" y="208">6</text><text x="690" y="208">7</text><text x="780" y="208">8</text>
+              </g>
+              <!-- read head at 4.63 -->
+              <line x1="477" y1="45" x2="477" y2="190" class="d-cyan-s" stroke-width="1.6" stroke-dasharray="4 4"/>
+              <circle cx="477" cy="139" r="6.5" class="d-cyan"/>
+              <text x="477" y="38" text-anchor="middle" class="d-cyan" style="font:600 11px/1 var(--mono)">read position 4.63</text>
+              <text x="493" y="150" class="d-sub">← this value doesn't exist — it must be invented</text>
+              <text x="60" y="232" class="d-sub">dots = stored samples (violet) · the playhead needs a value 63% of the way from sample 4 to sample 5 — that invention is interpolation</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Between the dots.</strong> Resampling asks for values at fractional positions like &ldquo;sample 4.63&rdquo;. Nothing is stored there, so the chip must invent one from the neighbours — nearest grabs sample 5, linear draws a line from 4 to 5, and the SNES blends four neighbours (below).</figcaption>
+          </figure>
+
           <p>
             The SNES uses something nicer: a <strong>4-point Gaussian
             interpolation</strong>. For each fractional position it takes the four
             nearest stored samples and blends them with weights read from a fixed
-            Gaussian-shaped table baked into the chip. The result is smooth, and it
+            Gaussian-shaped table baked into the chip — a 512-entry table on the real
+            silicon, which the lab below stands in for with a smooth Gaussian
+            approximation (the same shortcut its code comments admit to). The result is smooth, and it
             gently rolls off the highest frequencies — which, along with the 32&nbsp;kHz
             output, is the other half of why the SNES sounds so soft and round. Play
             the same bright sweep through nearest and Gaussian and the difference is
@@ -686,9 +855,13 @@
             <div>
               <p>
                 The resample speed is set by a per-voice 14-bit register,
-                <code>VxPITCH</code>. A value of <code>$1000</code> plays the sample at
-                its stored rate; double it to <code>$2000</code> and the voice plays an
-                octave up. We'll meet that register on real hardware in Module 12.
+                <code>VxPITCH</code>. A value of <code>$1000</code> means the DSP
+                consumes exactly <em>one stored sample per output sample</em> — the
+                data is read at the output rate of 32&nbsp;000 samples per second.
+                Double it to <code>$2000</code> and the DSP steps through two stored
+                samples per output sample: an octave up. <code>VxPITCH</code>'s slot in
+                the register table arrives in Module 09; the interpolation hardware
+                behind it in Module 12.
               </p>
             </div>
           </div>
@@ -746,6 +919,40 @@
             quieter than the last — until it fades. Many overlapping, decaying echoes blur
             into <span class="term" data-tip="The dense wash of countless overlapping echoes that makes a sound feel like it's in a room.">reverb</span>.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="Block diagram of a delay line with a feedback loop: input plus feedback goes into the delay, the delay output goes to the mix and back through a feedback gain into the input.">
+              <text x="30" y="30" class="d-tag d-cyan">The echo machine — three parts</text>
+              <!-- input -->
+              <text x="30" y="105" class="d-tag">input</text>
+              <line x1="86" y1="100" x2="130" y2="100" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="130,100 120,95 120,105" class="d-cyan"/>
+              <!-- adder -->
+              <circle cx="155" cy="100" r="18" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="155" y="106" text-anchor="middle" class="d-label" style="font-size:15px">+</text>
+              <line x1="173" y1="100" x2="240" y2="100" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="240,100 230,95 230,105" class="d-cyan"/>
+              <!-- delay box -->
+              <rect x="242" y="70" width="240" height="60" rx="10" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="362" y="96" text-anchor="middle" class="d-tag" style="font-size:12px">delay line</text>
+              <text x="362" y="114" text-anchor="middle" class="d-sub" style="font-size:10px">holds the sound N ms</text>
+              <!-- output -->
+              <line x1="482" y1="100" x2="800" y2="100" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="800,100 790,95 790,105" class="d-cyan"/>
+              <text x="812" y="105" class="d-tag">output</text>
+              <!-- feedback branch -->
+              <line x1="560" y1="100" x2="560" y2="160" class="d-amber-s" stroke-width="2"/>
+              <rect x="330" y="142" width="150" height="38" rx="9" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="405" y="160" text-anchor="middle" class="d-amber" style="font:600 11px/1 var(--mono)">× feedback (0–1)</text>
+              <text x="405" y="174" text-anchor="middle" class="d-sub" style="font-size:9px">each pass a bit quieter</text>
+              <line x1="560" y1="160" x2="480" y2="160" class="d-amber-s" stroke-width="2"/>
+              <polygon points="480,160 490,155 490,165" class="d-amber"/>
+              <line x1="330" y1="160" x2="155" y2="160" class="d-amber-s" stroke-width="2"/>
+              <line x1="155" y1="160" x2="155" y2="118" class="d-amber-s" stroke-width="2"/>
+              <polygon points="155,118 150,128 160,128" class="d-amber"/>
+            </svg>
+            <figcaption class="fig-cap"><strong>Delay + feedback.</strong> The input enters a delay line; its output goes to the speakers <em>and</em> loops back through a feedback gain into its own input, so each echo repeats a little quieter. This exact template — with an ARAM buffer as the delay line and a filter in the loop — is what Module 13's echo unit builds in silicon.</figcaption>
+          </figure>
           <p>
             The third part is a <strong>filter</strong>. Real walls absorb high
             frequencies more than low ones, so each echo should come back a little
@@ -755,6 +962,15 @@
             samples; the weights are called <strong>taps</strong>. Choose the taps and
             you choose the filter's colour. The SNES bakes exactly this into its echo
             hardware — an 8-tap FIR — which we'll design in Module 13.
+          </p>
+          <p>
+            &ldquo;Weighted sum&rdquo; sounds fancier than it is. Take a 3-tap FIR with
+            taps <code>0.5, 0.3, 0.2</code>, and suppose the three most recent input
+            samples were <code>10, 20, 40</code> (newest first). The output sample is
+            0.5&nbsp;×&nbsp;10 + 0.3&nbsp;×&nbsp;20 + 0.2&nbsp;×&nbsp;40 =
+            5&nbsp;+&nbsp;6&nbsp;+&nbsp;8 = <strong>19</strong>. That's the whole
+            algorithm: multiply each recent sample by its tap, add, slide forward one
+            sample, repeat — 32&nbsp;000 times a second.
           </p>
 
           <div class="lab" id="lab-echo">
@@ -831,7 +1047,7 @@
           <ul>
             <li>The <strong>SPC700</strong> — an 8-bit CPU running at roughly <strong>1.024&nbsp;MHz</strong>, with a small, quirky instruction set of its own.</li>
             <li><strong>64&nbsp;KB of private audio RAM</strong> (ARAM) — the SPC700's entire world: driver code, the sample directory, all BRR samples, and the echo buffer share this one space.</li>
-            <li>Two <strong>timers</strong> the driver reads to keep musical time.</li>
+            <li>Three <strong>timers</strong> the driver reads to keep musical time — T0 and T1 tick at 8&nbsp;kHz, T2 at a finer 64&nbsp;kHz.</li>
             <li>A 64-byte <strong>IPL boot ROM</strong> that runs at power-on and knows how to receive an upload.</li>
             <li>The <strong>S-DSP</strong> (next module), which does the actual sample decoding and mixing.</li>
           </ul>
@@ -856,7 +1072,7 @@
               <rect x="590" y="140" width="270" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
               <text x="725" y="166" text-anchor="middle" class="d-tag" style="font-size:11px">64 KB ARAM · driver + samples + echo</text>
               <rect x="590" y="192" width="130" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
-              <text x="655" y="218" text-anchor="middle" class="d-sub" style="font-size:10px">2 timers</text>
+              <text x="655" y="218" text-anchor="middle" class="d-sub" style="font-size:10px">3 timers (T0/T1 · T2)</text>
               <rect x="730" y="192" width="130" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
               <text x="795" y="218" text-anchor="middle" class="d-sub" style="font-size:10px">64-byte IPL ROM</text>
 
@@ -871,6 +1087,23 @@
             <figcaption class="fig-cap"><strong>Two computers, four bytes between them.</strong> The main CPU and the S-SMP each run on their own clock and share nothing but a four-register mailbox — <code>$2140–$2143</code> on the CPU side, the same latches as <code>$F4–$F7</code> on the SPC700 side.</figcaption>
           </figure>
 
+          <p>
+            Before the handshake, one thing is worth pinning down: what does
+            &ldquo;writing to <code>$2140</code>&rdquo; physically <em>mean</em>? Not
+            every address in a computer is RAM. Some addresses are wired straight to a
+            chip instead — store a byte there and it lands in a
+            <span class="term" data-tip="A small piece of storage inside a chip, reached through a fixed address or name — the chip's control knobs.">register</span>,
+            a byte-sized cell of the hardware itself. This is
+            <strong>memory-mapped I/O</strong>: the CPU talks to other chips with the
+            same store instructions it uses for memory, just at special addresses. The
+            four mailbox ports are
+            <span class="term" data-tip="A register that holds on to (latches) the last value written until someone overwrites it.">latches</span>
+            — each simply holds the last byte one side wrote until the other side gets
+            around to reading it. And the <strong>driver</strong> we keep mentioning is
+            not hardware at all: it's a program, the piece of SPC700 code that reads
+            those mailbox bytes and turns them into music. It gets a module of its own
+            (Module 14).
+          </p>
           <p>
             All communication squeezes through those four mailbox ports. At power-on
             the main CPU can't just poke samples into ARAM; it has to hand them over
@@ -983,13 +1216,25 @@
             </table>
           </div>
           <p>
+            Those volumes being <em>signed</em> is not a technicality. A negative
+            volume flips the waveform upside down — it inverts its
+            <strong>phase</strong> (Module 01). Set a voice's left volume positive and
+            its right volume negative and the two speakers push and pull in opposition,
+            a trick games leaned on for wide, pseudo-surround effects.
+          </p>
+          <p>
             The rest of the file is <strong>global</strong>: <code>KON</code>/<code>KOFF</code>
-            key voices on and off (one bit each), <code>FLG</code> holds mute/reset and
-            the noise clock, <code>MVOLL/R</code> and <code>EVOLL/R</code> are the master
+            key voices on and off (one bit each), <code>FLG</code> holds mute/reset,
+            the noise clock <em>and</em> the echo-write-enable bit <code>ECEN</code>
+            (remember it — it matters in Module 13), <code>MVOLL/R</code> and
+            <code>EVOLL/R</code> are the master
             and echo volumes, <code>PMON</code>/<code>NON</code>/<code>EON</code> enable
             pitch-modulation, noise and echo per voice, <code>DIR</code> points at the
             sample directory (Module 10), <code>ESA</code>/<code>EDL</code> place the echo
-            buffer (Module 13), and <code>C0</code>–<code>C7</code> are the echo FIR taps.
+            buffer and <code>EFB</code> (<code>$0D</code>) sets its feedback (Module 13),
+            <code>C0</code>–<code>C7</code> are the echo FIR taps, and the read-only
+            <code>ENDX</code> (<code>$7C</code>) reports which voices have reached their
+            sample's END block.
             Toggle the eight voices below and hear them sum.
           </p>
 
@@ -1049,6 +1294,70 @@
             and a <strong>loop</strong> pointer, both 16-bit. <code>VxSRCN</code> is
             simply the index into it.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 310" role="img" aria-label="The full sample lookup chain: SRCN equals 5 indexes the directory table at DIR times 256, whose entry holds a start and a loop pointer; the start pointer leads to a chain of 9-byte BRR blocks, and on the final END-plus-LOOP block playback bends back to the loop-point block.">
+              <text x="20" y="28" class="d-tag d-cyan">From &ldquo;play sample 5&rdquo; to bytes in ARAM</text>
+              <!-- SRCN box -->
+              <rect x="20" y="150" width="120" height="64" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="80" y="177" text-anchor="middle" class="d-tag" style="font-size:12px">VxSRCN</text>
+              <text x="80" y="198" text-anchor="middle" class="d-num" style="font-size:14px">= 5</text>
+              <line x1="140" y1="182" x2="176" y2="182" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="180,182 170,177 170,187" class="d-cyan"/>
+              <!-- directory table -->
+              <rect x="182" y="42" width="248" height="216" rx="10" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="306" y="64" text-anchor="middle" class="d-tag" style="font-size:12px">sample directory</text>
+              <text x="306" y="80" text-anchor="middle" class="d-sub" style="font-size:10px">table @ DIR × $100 = $2000</text>
+              <g>
+                <rect x="196" y="92" width="220" height="24" rx="5" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <text x="206" y="108" class="d-sub" style="font-size:10px">0 · start $2100 · loop $2100</text>
+                <rect x="196" y="120" width="220" height="24" rx="5" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <text x="206" y="136" class="d-sub" style="font-size:10px">1 · start $2180 · loop $21B0</text>
+                <text x="306" y="162" text-anchor="middle" class="d-sub">⋮</text>
+                <rect x="196" y="172" width="220" height="28" rx="5" class="d-fill-ground d-amber-s" stroke-width="1.6"/>
+                <text x="206" y="190" class="d-amber" style="font:600 10.5px/1 var(--mono)">5 · start $2450 · loop $2462</text>
+              </g>
+              <text x="306" y="224" text-anchor="middle" class="d-sub" style="font-size:10px">entry addr = $2000 + 5 × 4 = $2014</text>
+              <text x="306" y="242" text-anchor="middle" class="d-sub" style="font-size:10px">4 bytes: start lo·hi, loop lo·hi</text>
+              <!-- start arrow to first block -->
+              <path d="M 416 186 C 442 186, 442 136, 456 133" fill="none" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="460,132 450,128 451,138" class="d-cyan"/>
+              <text x="440" y="120" class="d-cyan" style="font:600 10px/1 var(--mono)">start</text>
+              <!-- BRR block chain -->
+              <g>
+                <rect x="460" y="100" width="100" height="64" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="510" y="120" text-anchor="middle" class="d-num" style="font-size:11px">$2450</text>
+                <text x="510" y="137" text-anchor="middle" class="d-sub" style="font-size:9px">hdr (filter 0)</text>
+                <text x="510" y="152" text-anchor="middle" class="d-sub" style="font-size:9px">+ 16 samples</text>
+                <text x="565" y="136" text-anchor="middle" class="d-flow">→</text>
+                <rect x="570" y="100" width="100" height="64" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="620" y="120" text-anchor="middle" class="d-num" style="font-size:11px">$2459</text>
+                <text x="620" y="137" text-anchor="middle" class="d-sub" style="font-size:9px">hdr</text>
+                <text x="620" y="152" text-anchor="middle" class="d-sub" style="font-size:9px">+ 16 samples</text>
+                <text x="675" y="136" text-anchor="middle" class="d-flow">→</text>
+                <rect x="680" y="100" width="100" height="64" rx="9" class="d-fill-panel2 d-amber-s" stroke-width="1.6"/>
+                <text x="730" y="120" text-anchor="middle" class="d-num" style="font-size:11px">$2462</text>
+                <text x="730" y="137" text-anchor="middle" class="d-amber" style="font:600 9px/1 var(--mono)">loop point</text>
+                <text x="730" y="152" text-anchor="middle" class="d-sub" style="font-size:9px">+ 16 samples</text>
+                <text x="785" y="136" text-anchor="middle" class="d-flow">→</text>
+                <rect x="790" y="100" width="100" height="64" rx="9" class="d-fill-panel2 d-magenta-s" stroke-width="1.6"/>
+                <text x="840" y="120" text-anchor="middle" class="d-num" style="font-size:11px">$246B</text>
+                <text x="840" y="137" text-anchor="middle" class="d-magenta" style="font:600 9px/1 var(--mono)">END + LOOP</text>
+                <text x="840" y="152" text-anchor="middle" class="d-sub" style="font-size:9px">+ 16 samples</text>
+              </g>
+              <!-- loop pointer arrow (directory → loop block) -->
+              <path d="M 416 196 C 520 262, 660 250, 702 172" fill="none" class="d-amber-s" stroke-width="1.6" stroke-dasharray="4 4"/>
+              <polygon points="704,168 696,175 705,179" class="d-amber"/>
+              <text x="520" y="272" class="d-amber" style="font:600 10px/1 var(--mono)">loop pointer</text>
+              <!-- loop-back arrow (END block → loop block) -->
+              <path d="M 842 168 C 852 226, 764 226, 750 176" fill="none" class="d-magenta-s" stroke-width="1.8"/>
+              <polygon points="748,170 744,181 754,180" class="d-magenta"/>
+              <text x="770" y="244" class="d-magenta" style="font:600 10px/1 var(--mono)">on END+LOOP: jump back, keep playing</text>
+              <text x="20" y="296" class="d-sub">9 bytes per block, so consecutive blocks sit 9 apart: $2450 → $2459 → $2462 → $246B · the attack blocks play once; the loop region repeats forever</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The lookup chain.</strong> <code>VxSRCN&nbsp;=&nbsp;5</code> indexes the directory at <code>DIR×$100</code>; entry 5 (at <code>DIR×$100&nbsp;+&nbsp;5×4</code>) holds two 16-bit pointers. Decoding starts at <em>start</em> and walks 9-byte BRR blocks until the <strong>END</strong> flag; with <strong>LOOP</strong> also set, playback bends back to the <em>loop</em> pointer — usually mid-sample, past the attack.</figcaption>
+          </figure>
+
           <p>
             So keying a voice on does this: read <code>VxSRCN</code>, jump to
             <code>DIR</code>'s table, pull out the start and loop addresses for that
@@ -1080,7 +1389,7 @@
                 </button>
                 <button class="play-btn" data-dir-loop style="background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#120c22">Hold the loop</button>
               </div>
-              <span class="lab-note">&ldquo;Hold the loop&rdquo; keeps decoding from the loop pointer on the END flag — press play elsewhere or scroll away to stop.</span>
+              <span class="lab-note">&ldquo;Hold the loop&rdquo; plays the attack blocks once, then repeats only the region between the loop pointer and the END block — exactly the hardware behaviour — for as long as you let it ring. Press play elsewhere or scroll away to stop.</span>
             </div>
           </div>
 
@@ -1120,23 +1429,100 @@
                 <tr><td rowspan="2"><code>VxADSR1</code> ($x5)</td><td>bit 7</td><td>1 = use ADSR (0 = use GAIN instead)</td></tr>
                 <tr><td>bits 6–4 / 3–0</td><td>decay rate (3 bits) · attack rate (4 bits)</td></tr>
                 <tr><td rowspan="2"><code>VxADSR2</code> ($x6)</td><td>bits 7–5</td><td>sustain level (3 bits, in eighths)</td></tr>
-                <tr><td>bits 4–0</td><td>sustain rate (5 bits) — the release/decay-toward-zero speed</td></tr>
+                <tr><td>bits 4–0</td><td>sustain rate (5 bits) — how fast the level sags from the sustain level <em>while the key is held</em></td></tr>
               </tbody>
             </table>
           </div>
           <p>
             The rates aren't times in milliseconds — they're indices into a fixed
             rate table in the chip. A higher attack rate means a faster attack; the
-            fastest is nearly instant, the slowest takes several seconds. Attack rises
+            fastest is nearly instant, the slowest takes several seconds. A few real
+            rows to calibrate your ear: attack rate 15 is effectively instantaneous
+            and rate 14 takes about <strong>6&nbsp;ms</strong>, while attack rate 0
+            crawls up over <strong>~4.1&nbsp;s</strong>; the fastest decay (rate 7)
+            falls in <strong>~37&nbsp;ms</strong>; sustain rate 31 fades in
+            <strong>~18&nbsp;ms</strong> while sustain rate 1 takes a glacial
+            <strong>~38&nbsp;s</strong>. Attack rises
             linearly; decay and the sustain phase fall <em>exponentially</em>, which is
             why SNES notes taper so naturally. Sustain rate 0 is special: it means
             &ldquo;hold the sustain level forever,&rdquo; used for organ-like tones.
           </p>
           <p>
+            One naming trap if you're mapping this back onto Module 05's ADSR: the
+            <strong>sustain rate is not the release</strong>. It governs how the
+            envelope keeps sagging from the sustain level <em>while the key is still
+            held</em>. So where did the &ldquo;R&rdquo; go? It happens at
+            <strong>key-off</strong>: when the driver clears the voice via
+            <code>KOF</code>, the chip ignores the sustain rate entirely and applies
+            one fixed release for every voice — a <em>linear</em> ramp down of 1⁄256 of
+            full scale per output sample, so even a full-volume note reaches silence in
+            about 8&nbsp;ms. On this chip the release isn't programmable at all.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 320" role="img" aria-label="The ADSR1 and ADSR2 bit fields, each field pointing at the envelope stage it controls, plus a small panel showing the fixed linear release ramp at key-off.">
+              <text x="20" y="28" class="d-tag d-cyan">Two bytes, four stages</text>
+              <!-- ADSR1 byte -->
+              <text x="30" y="58" class="d-sub">VxADSR1 · $x5</text>
+              <g>
+                <rect x="30"  y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.3"/><text x="47"  y="91" text-anchor="middle" class="d-num">E</text>
+                <rect x="66"  y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-cyan-s" stroke-width="1.3"/><text x="83"  y="91" text-anchor="middle" class="d-cyan" style="font:600 12px/1 var(--mono)">d</text>
+                <rect x="102" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-cyan-s" stroke-width="1.3"/><text x="119" y="91" text-anchor="middle" class="d-cyan" style="font:600 12px/1 var(--mono)">d</text>
+                <rect x="138" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-cyan-s" stroke-width="1.3"/><text x="155" y="91" text-anchor="middle" class="d-cyan" style="font:600 12px/1 var(--mono)">d</text>
+                <rect x="174" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-violet-s" stroke-width="1.3"/><text x="191" y="91" text-anchor="middle" class="d-violet" style="font:600 12px/1 var(--mono)">a</text>
+                <rect x="210" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-violet-s" stroke-width="1.3"/><text x="227" y="91" text-anchor="middle" class="d-violet" style="font:600 12px/1 var(--mono)">a</text>
+                <rect x="246" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-violet-s" stroke-width="1.3"/><text x="263" y="91" text-anchor="middle" class="d-violet" style="font:600 12px/1 var(--mono)">a</text>
+                <rect x="282" y="66" width="34" height="40" rx="6" class="d-fill-panel2 d-violet-s" stroke-width="1.3"/><text x="299" y="91" text-anchor="middle" class="d-violet" style="font:600 12px/1 var(--mono)">a</text>
+              </g>
+              <text x="30" y="124" class="d-sub" style="font-size:10px">E = 1 → use ADSR · <tspan class="d-cyan">ddd = decay rate</tspan> · <tspan class="d-violet">aaaa = attack rate</tspan></text>
+              <!-- ADSR2 byte -->
+              <text x="30" y="168" class="d-sub">VxADSR2 · $x6</text>
+              <g>
+                <rect x="30"  y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-amber-s" stroke-width="1.3"/><text x="47"  y="201" text-anchor="middle" class="d-amber" style="font:600 12px/1 var(--mono)">s</text>
+                <rect x="66"  y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-amber-s" stroke-width="1.3"/><text x="83"  y="201" text-anchor="middle" class="d-amber" style="font:600 12px/1 var(--mono)">s</text>
+                <rect x="102" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-amber-s" stroke-width="1.3"/><text x="119" y="201" text-anchor="middle" class="d-amber" style="font:600 12px/1 var(--mono)">s</text>
+                <rect x="138" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-magenta-s" stroke-width="1.3"/><text x="155" y="201" text-anchor="middle" class="d-magenta" style="font:600 12px/1 var(--mono)">r</text>
+                <rect x="174" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-magenta-s" stroke-width="1.3"/><text x="191" y="201" text-anchor="middle" class="d-magenta" style="font:600 12px/1 var(--mono)">r</text>
+                <rect x="210" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-magenta-s" stroke-width="1.3"/><text x="227" y="201" text-anchor="middle" class="d-magenta" style="font:600 12px/1 var(--mono)">r</text>
+                <rect x="246" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-magenta-s" stroke-width="1.3"/><text x="263" y="201" text-anchor="middle" class="d-magenta" style="font:600 12px/1 var(--mono)">r</text>
+                <rect x="282" y="176" width="34" height="40" rx="6" class="d-fill-panel2 d-magenta-s" stroke-width="1.3"/><text x="299" y="201" text-anchor="middle" class="d-magenta" style="font:600 12px/1 var(--mono)">r</text>
+              </g>
+              <text x="30" y="234" class="d-sub" style="font-size:10px"><tspan class="d-amber">sss = sustain level</tspan> · <tspan class="d-magenta">rrrrr = sustain rate (while held!)</tspan></text>
+              <!-- envelope curve -->
+              <text x="380" y="58" class="d-sub">the envelope those fields draw (key held)</text>
+              <line x1="380" y1="250" x2="660" y2="250" class="d-axis"/>
+              <path d="M 385 250 L 420 80 Q 448 148 480 152 L 655 196" fill="none" class="d-wave-c"/>
+              <line x1="380" y1="152" x2="660" y2="152" class="d-grid" stroke-dasharray="4 4"/>
+              <text x="402" y="72" class="d-violet" style="font:600 10px/1 var(--mono)">attack (linear)</text>
+              <text x="452" y="112" class="d-cyan" style="font:600 10px/1 var(--mono)">decay (exp)</text>
+              <text x="545" y="144" class="d-amber" style="font:600 10px/1 var(--mono)">sustain level</text>
+              <text x="530" y="216" class="d-magenta" style="font:600 10px/1 var(--mono)">sustain rate (exp sag)</text>
+              <!-- field → stage arrows -->
+              <path d="M 299 110 C 340 130, 370 150, 405 170" fill="none" class="d-violet-s" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <path d="M 155 110 C 240 140, 380 120, 448 118" fill="none" class="d-cyan-s" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <path d="M 119 220 C 220 260, 330 180, 376 156" fill="none" class="d-amber-s" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <path d="M 263 220 C 380 268, 480 240, 550 200" fill="none" class="d-magenta-s" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <!-- key-off panel -->
+              <rect x="700" y="60" width="180" height="200" rx="10" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="790" y="84" text-anchor="middle" class="d-tag" style="font-size:11px">key-off (KOF)</text>
+              <line x1="716" y1="230" x2="864" y2="230" class="d-axis"/>
+              <path d="M 716 120 L 726 120 L 800 230" fill="none" class="d-wave-m"/>
+              <text x="790" y="152" text-anchor="middle" class="d-sub" style="font-size:9.5px">fixed linear ramp</text>
+              <text x="790" y="168" text-anchor="middle" class="d-sub" style="font-size:9.5px">−1/256 per sample</text>
+              <text x="790" y="184" text-anchor="middle" class="d-sub" style="font-size:9.5px">≈ 8 ms from full</text>
+              <text x="790" y="252" text-anchor="middle" class="d-sub" style="font-size:9.5px">same for every voice · SR ignored</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The bit-fields and their stages.</strong> <code>ADSR1</code> packs the enable bit, decay rate and attack rate; <code>ADSR2</code> packs the sustain level and the sustain rate — which shapes the slow sag <em>while the key is held</em>. The release is not in either byte: key-off always triggers the same fixed linear ramp (right panel).</figcaption>
+          </figure>
+
+          <p>
             The alternative is <strong>GAIN</strong> mode (bit 7 of ADSR1 cleared).
             GAIN gives the driver hands-on control: a <em>direct</em> mode sets the
-            level outright, and four <em>ramp</em> modes slide the level up or down —
-            linearly or with a &ldquo;bent&rdquo; curve that eases off near the ends.
+            level outright, and four <em>ramp</em> modes slide the level:
+            <strong>linear increase</strong>, <strong>bent-line increase</strong>
+            (rises linearly, then eases off for the final quarter),
+            <strong>linear decrease</strong>, and <strong>exponential
+            decrease</strong>.
             Drivers use GAIN for effects ADSR can't express, like a slow fade-in or a
             custom multi-stage envelope. Either way, the chip exposes the current
             envelope level in the read-only <code>VxENVX</code> register (0–127) — the
@@ -1168,7 +1554,8 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li><code>VxADSR1/2</code> pack attack rate, decay rate, sustain level and sustain rate into bit-fields (rates are table indices, not times).</li>
-              <li>Clearing ADSR1 bit 7 switches to <code>VxGAIN</code>: direct level or linear/bent up/down ramps.</li>
+              <li>Sustain rate applies <em>while the key is held</em>; key-off (<code>KOF</code>) always uses the same fixed linear release ramp of −1/256 per sample.</li>
+              <li>Clearing ADSR1 bit 7 switches to <code>VxGAIN</code>: direct level, or four ramps — linear increase, bent-line increase, linear decrease, exponential decrease.</li>
               <li><code>VxENVX</code> reads back the current envelope level (0–127) at any instant.</li>
             </ul>
           </div>
@@ -1194,8 +1581,12 @@
             fractional position between stored samples. It takes the
             <strong>four</strong> nearest stored samples — two behind, two ahead — and
             multiplies each by a weight read from a fixed 512-entry
-            <strong>Gaussian table</strong> indexed by the fractional part of
-            <code>VxPITCH</code>. Sum the four weighted taps and that's the output.
+            <strong>Gaussian table</strong>, indexed by the fractional part of the
+            voice's accumulating <em>pitch counter</em> — the running position that
+            grows by <code>VxPITCH</code> every output sample. (<code>VxPITCH</code>
+            is the step size; the counter's fraction is where the read head currently
+            sits between two stored samples.) Sum the four weighted taps and that's
+            the output.
           </p>
           <p>
             Drag the position below and watch the four active taps slide along the
@@ -1228,17 +1619,45 @@
             <strong>Pitch modulation</strong> (<code>PMON</code>) lets voice
             <em>N</em>'s output continuously bend the pitch of voice <em>N+1</em> — a
             cheap way to make growling, vibrato-rich, or metallic sounds without extra
-            samples. And the <strong>noise generator</strong> (<code>NON</code>)
+            samples. (Voice 0 is the exception: it has no lower-numbered neighbour to
+            listen to, so its <code>PMON</code> bit does nothing.) And the <strong>noise generator</strong> (<code>NON</code>)
             replaces a voice's sample with pseudo-random noise, clocked at a rate set
             in the <code>FLG</code> register — the source of wind, surf, cymbals and
             explosions. Both are per-voice enable bits, so a game can mix tonal voices,
             a modulated voice and a noise voice in the same eight.
           </p>
 
+          <figure class="figure">
+            <svg viewBox="0 0 900 210" role="img" aria-label="PMON routing: the output of voice N minus 1 feeds the pitch input of voice N; voice 0 has no neighbour and is exempt.">
+              <text x="20" y="28" class="d-tag d-cyan">PMON — the neighbour wiggle</text>
+              <!-- voice 0 -->
+              <rect x="40" y="60" width="220" height="90" rx="10" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="150" y="86" text-anchor="middle" class="d-tag" style="font-size:12px">voice N−1 (e.g. V0)</text>
+              <text x="150" y="106" text-anchor="middle" class="d-sub" style="font-size:10px">plays its own sample</text>
+              <text x="150" y="130" text-anchor="middle" class="d-num" style="font-size:11px">OUTX →</text>
+              <!-- arrow -->
+              <path d="M 260 128 C 320 128, 340 84, 398 82" fill="none" class="d-amber-s" stroke-width="2.2"/>
+              <polygon points="402,82 391,77 391,88" class="d-amber"/>
+              <text x="330" y="160" text-anchor="middle" class="d-amber" style="font:600 10.5px/1 var(--mono)">PMON bit N set:</text>
+              <text x="330" y="176" text-anchor="middle" class="d-sub" style="font-size:10px">N−1's output wiggles N's pitch</text>
+              <!-- voice 1 -->
+              <rect x="404" y="52" width="240" height="98" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.6"/>
+              <text x="524" y="78" text-anchor="middle" class="d-tag" style="font-size:12px">voice N (e.g. V1)</text>
+              <text x="524" y="98" text-anchor="middle" class="d-sub" style="font-size:10px">pitch = VxPITCH ± neighbour's output</text>
+              <text x="524" y="118" text-anchor="middle" class="d-sub" style="font-size:10px">→ vibrato, growl, FM-ish bells</text>
+              <!-- exemption note -->
+              <rect x="690" y="60" width="190" height="90" rx="10" class="d-fill-ground d-stroke-line" stroke-width="1.3"/>
+              <text x="785" y="88" text-anchor="middle" class="d-tag" style="font-size:11px">voice 0 is exempt</text>
+              <text x="785" y="108" text-anchor="middle" class="d-sub" style="font-size:9.5px">no voice sits before it,</text>
+              <text x="785" y="124" text-anchor="middle" class="d-sub" style="font-size:9.5px">so PMON bit 0 does nothing</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>One arrow.</strong> Setting a voice's <code>PMON</code> bit routes the <em>previous</em> voice's output (<code>OUTX</code>) into its pitch. Voice 0 has no previous voice, so its bit is dead — modulator pairs start at V0→V1.</figcaption>
+          </figure>
+
           <div class="takeaway">
             <div class="th">Key takeaways</div>
             <ul>
-              <li>The S-DSP resamples with a 4-point Gaussian: four taps weighted by a fixed table indexed by the pitch fraction.</li>
+              <li>The S-DSP resamples with a 4-point Gaussian: four taps weighted by a fixed table indexed by the pitch counter's fractional part.</li>
               <li>The Gaussian's smoothness rolls off highs — the technical reason for the SNES's warm tone.</li>
               <li><code>PMON</code> lets one voice modulate the next voice's pitch; <code>NON</code> swaps a voice for the noise generator.</li>
             </ul>
@@ -1264,8 +1683,16 @@
             <strong>echo unit</strong>. It's the delay-feedback-filter machine of
             Module 07, built into the chip. The delay lives in a circular
             <strong>echo buffer inside ARAM</strong>: the <code>ESA</code> register
-            sets its start page and <code>EDL</code> sets its length (in 16&nbsp;ms
-            steps). Because it sits in the same 64&nbsp;KB as the samples, a long echo
+            sets its start page and <code>EDL</code> sets its length in 16&nbsp;ms
+            steps, from 0 to 15 — so the longest possible echo is
+            15&nbsp;×&nbsp;16 = <strong>240&nbsp;ms</strong>. (<code>EDL&nbsp;=&nbsp;0</code>
+            is a special case: the buffer doesn't vanish but shrinks to a token
+            <strong>4 bytes</strong>.) The price is concrete: at 32&nbsp;000
+            samples/s in 16-bit stereo, 240&nbsp;ms of delay is
+            240&nbsp;ms&nbsp;×&nbsp;32&nbsp;000&nbsp;×&nbsp;4&nbsp;bytes ≈
+            <strong>30&nbsp;KB — nearly half of the 64&nbsp;KB of ARAM</strong>, gone
+            from the space the samples live in. Because the buffer sits in the same
+            64&nbsp;KB as the samples, a long echo
             eats memory the samples could have used — a constant trade-off for SNES
             composers.
           </p>
@@ -1306,17 +1733,17 @@
             <div class="lab-body">
               <canvas class="fir-canvas" aria-label="FIR taps and frequency response"></canvas>
               <div class="fir-bank">
-                <div class="fcol"><input type="range" min="-100" max="127" value="64" data-fir aria-label="C0"><span class="fn">C0</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="36" data-fir aria-label="C1"><span class="fn">C1</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="18" data-fir aria-label="C2"><span class="fn">C2</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="8" data-fir aria-label="C3"><span class="fn">C3</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="2" data-fir aria-label="C4"><span class="fn">C4</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C5"><span class="fn">C5</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C6"><span class="fn">C6</span></div>
-                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C7"><span class="fn">C7</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="64" data-fir aria-label="C0"><span class="fn">C0</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="36" data-fir aria-label="C1"><span class="fn">C1</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="18" data-fir aria-label="C2"><span class="fn">C2</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="8" data-fir aria-label="C3"><span class="fn">C3</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="2" data-fir aria-label="C4"><span class="fn">C4</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="0" data-fir aria-label="C5"><span class="fn">C5</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="0" data-fir aria-label="C6"><span class="fn">C6</span></div>
+                <div class="fcol"><input type="range" min="-128" max="127" value="0" data-fir aria-label="C7"><span class="fn">C7</span></div>
               </div>
               <div class="controls">
-                <div class="ctrl"><label>Delay — <span class="val" data-fir-delay-val>160 ms</span></label><input type="range" min="16" max="480" value="160" step="16" data-fir-delay aria-label="Echo delay"></div>
+                <div class="ctrl"><label>Delay (EDL × 16 ms, max 240) — <span class="val" data-fir-delay-val>160 ms</span></label><input type="range" min="16" max="240" value="160" step="16" data-fir-delay aria-label="Echo delay"></div>
                 <div class="ctrl"><label>Feedback (EFB) — <span class="val" data-fir-fb-val>50 %</span></label><input type="range" min="0" max="90" value="50" data-fir-fb aria-label="Feedback"></div>
                 <div class="seg-btns" role="group" aria-label="FIR presets"><button data-fir-preset="lp">low-pass</button><button data-fir-preset="hp">bright</button><button data-fir-preset="none">bypass</button></div>
                 <button class="play-btn" data-fir-play>
@@ -1360,6 +1787,71 @@
             the whole output stage — a handful of multiplies and adds, done in
             hardware.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 350" role="img" aria-label="The complete S-DSP mixer: eight voices scaled by their volumes are summed and scaled by the master volume; in parallel, EON-selected voices feed the echo buffer, the 8-tap FIR and the echo volume; both paths are added, clamped to 16 bits and sent to the 32 kilohertz DAC.">
+              <text x="20" y="26" class="d-tag d-cyan">The whole output stage</text>
+              <!-- 8 voices -->
+              <g>
+                <rect x="20" y="40"  width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="56"  text-anchor="middle" class="d-sub" style="font-size:9.5px">V0 × VOL L/R</text>
+                <rect x="20" y="72"  width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="88"  text-anchor="middle" class="d-sub" style="font-size:9.5px">V1 × VOL L/R</text>
+                <rect x="20" y="104" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="120" text-anchor="middle" class="d-sub" style="font-size:9.5px">V2 × VOL L/R</text>
+                <rect x="20" y="136" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="152" text-anchor="middle" class="d-sub" style="font-size:9.5px">V3 × VOL L/R</text>
+                <rect x="20" y="168" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="184" text-anchor="middle" class="d-sub" style="font-size:9.5px">V4 × VOL L/R</text>
+                <rect x="20" y="200" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="216" text-anchor="middle" class="d-sub" style="font-size:9.5px">V5 × VOL L/R</text>
+                <rect x="20" y="232" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="248" text-anchor="middle" class="d-sub" style="font-size:9.5px">V6 × VOL L/R</text>
+                <rect x="20" y="264" width="126" height="24" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1.1"/><text x="83" y="280" text-anchor="middle" class="d-sub" style="font-size:9.5px">V7 × VOL L/R</text>
+              </g>
+              <g class="d-stroke-line" stroke-width="1.2">
+                <line x1="146" y1="52"  x2="206" y2="128"/><line x1="146" y1="84"  x2="204" y2="136"/>
+                <line x1="146" y1="116" x2="203" y2="146"/><line x1="146" y1="148" x2="202" y2="155"/>
+                <line x1="146" y1="180" x2="202" y2="170"/><line x1="146" y1="212" x2="203" y2="180"/>
+                <line x1="146" y1="244" x2="204" y2="190"/><line x1="146" y1="276" x2="206" y2="198"/>
+              </g>
+              <!-- sum + master volume -->
+              <circle cx="236" cy="162" r="34" class="d-fill-panel d-violet-s" stroke-width="1.8"/>
+              <text x="236" y="169" text-anchor="middle" class="d-label" style="font-size:16px">Σ</text>
+              <line x1="270" y1="162" x2="306" y2="162" class="d-cyan-s" stroke-width="2"/>
+              <rect x="308" y="142" width="96" height="40" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="356" y="166" text-anchor="middle" class="d-tag" style="font-size:11px">× MVOL L/R</text>
+              <line x1="404" y1="162" x2="540" y2="162" class="d-cyan-s" stroke-width="2"/>
+              <polygon points="544,162 534,157 534,167" class="d-cyan"/>
+              <!-- final adder / clamp / DAC -->
+              <circle cx="562" cy="162" r="18" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="562" y="168" text-anchor="middle" class="d-label" style="font-size:14px">+</text>
+              <line x1="580" y1="162" x2="612" y2="162" class="d-cyan-s" stroke-width="2"/>
+              <rect x="614" y="142" width="110" height="40" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="669" y="166" text-anchor="middle" class="d-tag" style="font-size:11px">clamp to 16-bit</text>
+              <line x1="724" y1="162" x2="750" y2="162" class="d-cyan-s" stroke-width="2"/>
+              <rect x="752" y="136" width="128" height="52" rx="9" class="d-fill-panel d-cyan-s" stroke-width="1.6"/>
+              <text x="816" y="158" text-anchor="middle" class="d-cyan" style="font:600 11px/1 var(--mono)">32 kHz DAC</text>
+              <text x="816" y="176" text-anchor="middle" class="d-sub" style="font-size:9.5px">stereo out</text>
+              <!-- echo branch -->
+              <line x1="236" y1="196" x2="236" y2="252" class="d-magenta-s" stroke-width="1.8" stroke-dasharray="4 3"/>
+              <text x="248" y="228" class="d-sub" style="font-size:9.5px">only voices with their EON bit set</text>
+              <rect x="160" y="254" width="170" height="46" rx="9" class="d-fill-ground d-magenta-s" stroke-width="1.5"/>
+              <text x="245" y="273" text-anchor="middle" class="d-magenta" style="font:600 10.5px/1 var(--mono)">echo buffer (ARAM)</text>
+              <text x="245" y="290" text-anchor="middle" class="d-sub" style="font-size:9px">ESA start · EDL length</text>
+              <line x1="330" y1="277" x2="366" y2="277" class="d-magenta-s" stroke-width="1.8"/>
+              <rect x="368" y="254" width="140" height="46" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="438" y="273" text-anchor="middle" class="d-tag" style="font-size:10.5px">8-tap FIR</text>
+              <text x="438" y="290" text-anchor="middle" class="d-sub" style="font-size:9px">C0…C7</text>
+              <line x1="508" y1="277" x2="544" y2="277" class="d-magenta-s" stroke-width="1.8"/>
+              <rect x="546" y="254" width="92" height="46" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="592" y="281" text-anchor="middle" class="d-tag" style="font-size:11px">× EVOL L/R</text>
+              <line x1="592" y1="254" x2="564" y2="182" class="d-magenta-s" stroke-width="1.8"/>
+              <polygon points="563,180 561,191 571,188" class="d-magenta"/>
+              <!-- EFB feedback loop -->
+              <line x1="438" y1="300" x2="438" y2="326" class="d-amber-s" stroke-width="1.6"/>
+              <rect x="270" y="312" width="120" height="28" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="330" y="330" text-anchor="middle" class="d-amber" style="font:600 10px/1 var(--mono)">× EFB feedback</text>
+              <line x1="438" y1="326" x2="390" y2="326" class="d-amber-s" stroke-width="1.6"/>
+              <line x1="270" y1="326" x2="245" y2="326" class="d-amber-s" stroke-width="1.6"/>
+              <line x1="245" y1="326" x2="245" y2="304" class="d-amber-s" stroke-width="1.6"/>
+              <polygon points="245,302 240,312 250,312" class="d-amber"/>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two paths to the speaker.</strong> Dry path on top: eight voices × <code>VxVOL</code> → Σ → × <code>MVOL</code>. Echo path below: <code>EON</code>-selected voices are written into the ARAM echo buffer, come back through the 8-tap FIR, feed themselves back via <code>EFB</code>, and join the mix through <code>EVOL</code>. The sum is clamped to 16 bits and clocked out at 32&nbsp;kHz.</figcaption>
+          </figure>
           <p>
             But the S-DSP has no idea what a &ldquo;song&rdquo; is. It only knows
             registers. Turning sheet music into register writes is the job of a
@@ -1421,7 +1913,8 @@
             synchronised computers cycle by cycle — and then package the result so you
             can share a song as a tiny file. These last two modules cover the timing
             problem at the heart of accurate SNES audio emulation, and the SPC file
-            format that lets a five-kilobyte download play a full track.
+            format that lets a fixed 66,048-byte download — barely more than the 64&nbsp;KB
+            of ARAM it wraps — play a full track.
           </p>
           <div class="part-meta"><span>Modules <b>15–16</b></span><span>Tools <b>bsnes · snes9x</b></span><span>Labs <b>2 interactive</b></span></div>
         </div>
@@ -1440,7 +1933,12 @@
             — it has to <em>run</em> it. That means two problems at once. First, there
             are <strong>two crystals</strong>: the main system runs at
             21.477&nbsp;MHz while the S-SMP runs off its own ~24.576&nbsp;MHz crystal
-            (divided down to the SPC700's ~1.024&nbsp;MHz). The two aren't in any tidy
+            (divided down to the SPC700's ~1.024&nbsp;MHz). A quick word on the unit
+            hiding in &ldquo;MHz&rdquo;: a CPU
+            <span class="term" data-tip="One tick of a processor's clock — the smallest step in which it does anything at all.">cycle</span>
+            is a single tick of a chip's clock, the smallest step in which it can do
+            any work, and megahertz just counts millions of those ticks per second.
+            The two clocks here aren't in any tidy
             ratio, so the emulator must interleave them carefully; let them drift and
             the mailbox handshake from Module 08 breaks, and games hang waiting for an
             APU that answered a beat too early or too late.
@@ -1452,15 +1950,45 @@
             shared port — sometimes cycle by cycle. Get it slightly wrong and you get
             missing music, stuck notes, or a boot that never completes.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 260" role="img" aria-label="Two timelines with different tick spacings for the S-CPU and S-SMP clocks; the emulator runs each in slices, and a mailbox access forces both to synchronise at the same instant.">
+              <text x="20" y="26" class="d-tag d-cyan">Two clocks, one moment of truth</text>
+              <!-- CPU ruler -->
+              <text x="20" y="66" class="d-sub">S-CPU · 21.477 MHz</text>
+              <line x1="20" y1="90" x2="880" y2="90" class="d-axis"/>
+              <g class="d-stroke-line" stroke-width="1">
+                <line x1="20" y1="84" x2="20" y2="96"/><line x1="68" y1="84" x2="68" y2="96"/><line x1="116" y1="84" x2="116" y2="96"/><line x1="164" y1="84" x2="164" y2="96"/><line x1="212" y1="84" x2="212" y2="96"/><line x1="260" y1="84" x2="260" y2="96"/><line x1="308" y1="84" x2="308" y2="96"/><line x1="356" y1="84" x2="356" y2="96"/><line x1="404" y1="84" x2="404" y2="96"/><line x1="452" y1="84" x2="452" y2="96"/><line x1="500" y1="84" x2="500" y2="96"/><line x1="548" y1="84" x2="548" y2="96"/><line x1="596" y1="84" x2="596" y2="96"/><line x1="644" y1="84" x2="644" y2="96"/><line x1="692" y1="84" x2="692" y2="96"/><line x1="740" y1="84" x2="740" y2="96"/><line x1="788" y1="84" x2="788" y2="96"/><line x1="836" y1="84" x2="836" y2="96"/>
+              </g>
+              <rect x="20" y="76" width="240" height="12" rx="4" class="d-cyan" opacity="0.55"/>
+              <rect x="510" y="76" width="200" height="12" rx="4" class="d-cyan" opacity="0.55"/>
+              <text x="140" y="116" text-anchor="middle" class="d-sub" style="font-size:9.5px">emulator runs the CPU ahead…</text>
+              <!-- APU ruler -->
+              <text x="20" y="166" class="d-sub">S-SMP · 24.576 MHz</text>
+              <line x1="20" y1="190" x2="880" y2="190" class="d-axis"/>
+              <g class="d-stroke-line" stroke-width="1">
+                <line x1="20" y1="184" x2="20" y2="196"/><line x1="62" y1="184" x2="62" y2="196"/><line x1="104" y1="184" x2="104" y2="196"/><line x1="146" y1="184" x2="146" y2="196"/><line x1="188" y1="184" x2="188" y2="196"/><line x1="230" y1="184" x2="230" y2="196"/><line x1="272" y1="184" x2="272" y2="196"/><line x1="314" y1="184" x2="314" y2="196"/><line x1="356" y1="184" x2="356" y2="196"/><line x1="398" y1="184" x2="398" y2="196"/><line x1="440" y1="184" x2="440" y2="196"/><line x1="482" y1="184" x2="482" y2="196"/><line x1="524" y1="184" x2="524" y2="196"/><line x1="566" y1="184" x2="566" y2="196"/><line x1="608" y1="184" x2="608" y2="196"/><line x1="650" y1="184" x2="650" y2="196"/><line x1="692" y1="184" x2="692" y2="196"/><line x1="734" y1="184" x2="734" y2="196"/><line x1="776" y1="184" x2="776" y2="196"/><line x1="818" y1="184" x2="818" y2="196"/><line x1="860" y1="184" x2="860" y2="196"/>
+              </g>
+              <rect x="260" y="176" width="240" height="12" rx="4" class="d-violet" opacity="0.55"/>
+              <text x="380" y="216" text-anchor="middle" class="d-sub" style="font-size:9.5px">…then the APU catches up to the same instant</text>
+              <!-- sync point -->
+              <line x1="500" y1="56" x2="500" y2="230" class="d-amber-s" stroke-width="2" stroke-dasharray="5 4"/>
+              <rect x="512" y="34" width="240" height="26" rx="7" class="d-fill-panel2 d-amber-s" stroke-width="1.4"/>
+              <text x="632" y="51" text-anchor="middle" class="d-amber" style="font:600 10.5px/1 var(--mono)">CPU touches $2140 ⇒ sync point</text>
+              <text x="20" y="246" class="d-sub">tick spacings differ (the clocks share no tidy ratio) · slices may run ahead, but a mailbox access forces both cores to the exact same instant</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Interleaved execution.</strong> An emulator can't run both chips truly in parallel, so it alternates slices — CPU a while, then APU up to the same point in time. The moment either side touches a mailbox port, the other must be caught up <em>exactly</em>, or the handshake reads a stale byte.</figcaption>
+          </figure>
           <p>
             On top of timing sit the fiddly details of the DSP itself: the exact
             512-entry <strong>Gaussian table</strong>, the precise integer maths of the
             four BRR filters, and edge cases like what a shift value above 12 does or
             how the very first block behaves. Getting these bit-exact took years of
             reverse engineering. Much of it crystallised in <strong>blargg's
-            SPC_DSP</strong> core — a compact, accurate C++ implementation that
-            <strong>bsnes</strong> and <strong>snes9x</strong> both reuse, which is why
-            they agree down to the sample. The lab steps an SPC700 driver snippet as it
+            SPC_DSP</strong> core — a compact, bit-accurate C++ implementation.
+            <strong>snes9x</strong> uses that core directly, and <strong>bsnes</strong>'
+            own DSP is derived from the same core and the research behind it — which is
+            why the two agree down to the sample. The lab steps an SPC700 driver snippet as it
             writes a voice's volumes and keys it on — the fetch/execute cycle an
             emulator runs millions of times a second.
           </p>
@@ -1480,13 +2008,14 @@
               <span class="lab-note" data-spc-note></span>
             </div>
           </div>
+          <p class="lab-note">Reading the listing: in <code>MOV X, #$4C</code> the <code>#</code> means &ldquo;this literal number&rdquo; — copy the value $4C itself into register X. Without <code>#</code>, as in <code>MOV $F2, X</code>, the operand is an <em>address</em>: X's value is stored to location $F2. Everything after <code>;</code> is a comment for humans.</p>
 
           <div class="takeaway">
             <div class="th">Key takeaways</div>
             <ul>
               <li>SNES audio accuracy means running two crystals in lock-step (21.477 MHz vs the SMP's ~24.576 MHz → 1.024 MHz).</li>
               <li>The CPU↔APU mailbox is polled in tight loops, so the emulator must sync the two cores tightly.</li>
-              <li>blargg's SPC_DSP core — reused by bsnes and snes9x — nails the Gaussian table and BRR-decode edge cases.</li>
+              <li>blargg's SPC_DSP core — used directly by snes9x, and the basis for bsnes' derived DSP — nails the Gaussian table and BRR-decode edge cases.</li>
             </ul>
           </div>
 
@@ -1509,12 +2038,47 @@
             Here's the elegant payoff of the two-computer design. Because the whole
             song lives inside the APU — driver, samples and all — you can capture a
             track by freezing the APU's entire state. That snapshot is the
-            <strong>SPC file format</strong>, and it's tiny: a full
-            <strong>64&nbsp;KB dump of ARAM</strong>, the <strong>128 bytes of DSP
-            registers</strong>, the SPC700's CPU registers, and a chunk of
-            <strong>ID666</strong> metadata tags (song title, game, composer, length).
-            No audio is stored at all — just the machine, paused mid-song.
+            <strong>SPC file format</strong>, and it's small and rigidly fixed in
+            size: a 256-byte header carrying the SPC700's CPU registers and the
+            <strong>ID666</strong> metadata tags (song title, game, composer, length —
+            the same idea as an MP3's ID3 tags), then a full <strong>64&nbsp;KB dump
+            of ARAM</strong>, the <strong>128 bytes of DSP registers</strong>, and a
+            few spare bytes: <strong>66&nbsp;048 bytes</strong>, every time. No
+            <em>rendered</em> audio is stored — the ARAM dump does contain the
+            BRR-compressed samples, but the finished waveform the console would output
+            is nowhere in the file. It's the machine itself, paused mid-song.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 220" role="img" aria-label="Byte map of an SPC file: a 256-byte header with CPU registers and ID666 tags, the 65,536-byte ARAM dump, 128 bytes of DSP registers and 128 spare bytes — 66,048 bytes in total.">
+              <text x="30" y="28" class="d-tag d-cyan">One .spc file — 66,048 bytes, fixed</text>
+              <!-- proportional-ish bar (thin slices widened to stay visible) -->
+              <rect x="30"  y="60" width="50"  height="56" rx="6" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <rect x="80"  y="60" width="680" height="56" rx="0" class="d-fill-panel d-stroke-line" stroke-width="1.3"/>
+              <text x="420" y="84" text-anchor="middle" class="d-tag" style="font-size:12px">ARAM dump — 65,536 bytes</text>
+              <text x="420" y="102" text-anchor="middle" class="d-sub" style="font-size:10px">driver code + DIR table + BRR samples + echo buffer, exactly as frozen</text>
+              <rect x="760" y="60" width="50"  height="56" rx="0" class="d-fill-ground d-magenta-s" stroke-width="1.5"/>
+              <rect x="810" y="60" width="60"  height="56" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1.3"/>
+              <!-- leader labels -->
+              <line x1="55" y1="116" x2="55" y2="146" class="d-amber-s" stroke-width="1.2"/>
+              <text x="30" y="162" class="d-amber" style="font:600 10.5px/1 var(--mono)">header · 256 B</text>
+              <text x="30" y="178" class="d-sub" style="font-size:9.5px">magic + SPC700 CPU regs</text>
+              <text x="30" y="192" class="d-sub" style="font-size:9.5px">+ ID666 tags (≈ MP3's ID3)</text>
+              <line x1="785" y1="116" x2="785" y2="146" class="d-magenta-s" stroke-width="1.2"/>
+              <text x="700" y="162" class="d-magenta" style="font:600 10.5px/1 var(--mono)">DSP regs · 128 B</text>
+              <text x="700" y="178" class="d-sub" style="font-size:9.5px">the whole $00–$7F map</text>
+              <text x="820" y="192" class="d-sub" style="font-size:9.5px">spare/extra RAM · 128 B</text>
+              <!-- offsets -->
+              <g class="d-sub" style="font-size:9.5px">
+                <text x="30" y="52">$00000</text>
+                <text x="80" y="52">$00100</text>
+                <text x="718" y="52">$10100</text>
+                <text x="812" y="52">$10180</text>
+              </g>
+              <text x="30" y="214" class="d-sub">256 + 65,536 + 128 + 128 = 66,048 bytes · thin slices widened to stay visible (at true scale the header is 3 px) · some files append an optional extended-ID666 tail</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The byte map.</strong> An SPC file is the APU's whole world in one flat snapshot: a 256-byte header (CPU registers + ID666 tags), the entire 64&nbsp;KB of ARAM, the 128 DSP registers, and 128 spare bytes — a fixed 66,048 bytes, whatever the song.</figcaption>
+          </figure>
           <p>
             An SPC player is therefore not really a player of audio; it's a mini SNES
             with only the sound half. It loads the 64&nbsp;KB into an emulated ARAM,
@@ -1522,8 +2086,8 @@
             frozen driver keep running</strong> from exactly where it was captured. The
             music resumes because the driver picks up its own sequence data and carries
             on writing <code>KON</code>s — the same loop from Module 14, thawed. This is
-            why a five-kilobyte file can play minutes of music: you're shipping the
-            program, not the performance.
+            why a 66,048-byte file can play minutes of music: you're shipping the
+            program and its instruments, not the performance.
           </p>
           <div class="note">
             <div class="ico">▸</div>

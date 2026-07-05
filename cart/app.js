@@ -187,7 +187,7 @@ function DecodeLab(root) {
   const REGIONS = [
     { name: 'WRAM mirror', cs: '/WRAM', lo: 0x0000, hi: 0x1FFF, col: PAL.cyan },
     { name: 'I/O & PPU/APU regs', cs: '/IO', lo: 0x2000, hi: 0x5FFF, col: PAL.violet },
-    { name: 'expansion / SRAM window', cs: '/SRAM', lo: 0x6000, hi: 0x7FFF, col: PAL.amber },
+    { name: 'expansion / SRAM window (HiROM carts)', cs: '/SRAM', lo: 0x6000, hi: 0x7FFF, col: PAL.amber },
     { name: 'cartridge ROM', cs: '/CART', lo: 0x8000, hi: 0xFFFF, col: PAL.magenta },
   ];
   let off = 0x8100;
@@ -369,8 +369,8 @@ function PinoutLab(root) {
     ['A8', 'addr', 'Address line 8 — start of the high byte.'],
     ['A12', 'addr', 'Address line 12.'],
     ['A15', 'addr', 'Address line 15 — top of the 16-bit offset within a bank.'],
-    ['A20', 'addr', 'Address line 20 — part of the 8-bit bank number (A16–A23).'],
-    ['A23', 'addr', 'Address line 23 — most-significant bank bit; 24 lines reach 16 MB.'],
+    ['BA4', 'addr', 'Bank-address line 4 — one of the eight BA0–BA7 pins that carry the 8-bit bank byte (the top of the 24-bit address). There are no literal A16–A23 pins.'],
+    ['BA7', 'addr', 'Bank-address line 7 — the most-significant bank bit; A0–A15 plus BA0–BA7 together reach 16 MB.'],
     ['/RD', 'ctrl', 'Read strobe — pulled low when the CPU wants to read the addressed byte.'],
     ['/WR', 'ctrl', 'Write strobe — pulled low when the CPU writes (used for SRAM & chip regs).'],
     ['/CART', 'ctrl', 'Cartridge select — the decoded chip-select telling the pak "this access is yours".'],
@@ -385,11 +385,11 @@ function PinoutLab(root) {
     ['/RESET', 'ctrl', 'Reset — held low at power-up and when the console is reset.'],
     ['/IRQ', 'ctrl', 'Interrupt request — a cart chip (e.g. an enhancement chip) can signal the CPU.'],
     ['/REFRESH', 'ctrl', 'DRAM refresh timing pulse shared with the cartridge.'],
-    ['PARD', 'ctrl', 'Peripheral address decode — helps on-cart hardware qualify accesses.'],
+    ['/PARD', 'ctrl', 'Address-Bus-B read strobe — pulses low when the CPU reads a peripheral ("B bus") address; on-cart hardware can watch these accesses.'],
     ['SYSCLK', 'clk', 'The master system clock reference.'],
     ['SOUND-L', 'aud', 'Audio into the cart — lets a pak mix or pass through the console’s sound.'],
     ['SOUND-R', 'aud', 'The right audio channel routed through the connector.'],
-    ['EXP', 'exp', 'A second expansion pin — the "expansion port" that made add-on chips possible.'],
+    ['EXP', 'exp', 'A second expansion pin — spare connectivity; the real enabler for add-on chips is the ordinary address/data bus on the other pins.'],
   ];
 
   const name = root.querySelector('[data-pin-name]');
@@ -467,13 +467,13 @@ function BoardLab(root) {
     { id: 'rom', label: 'Mask ROM', tag: 'always present', col: PAL.cyan,
       desc: 'The game itself: 4–48 Mbit of read-only memory with its bits fixed at the factory. Its data lines feed straight onto the cartridge bus.' },
     { id: 'sram', label: 'Save SRAM', tag: 'optional', col: PAL.amber,
-      desc: 'A small static RAM (2–256 Kbit) that stores saved games. Written through /WR when the game addresses its SRAM window.' },
+      desc: 'A small static RAM (16–256 Kbit) that stores saved games. Written through /WR when the game addresses its SRAM window.' },
     { id: 'batt', label: 'Coin cell', tag: 'with SRAM', col: PAL.good,
       desc: 'A 3 V lithium battery that trickles current into the SRAM so a save survives with the console off. When it dies, saves vanish.' },
     { id: 'chip', label: 'Enhancement chip', tag: 'optional', col: PAL.magenta,
       desc: 'A coprocessor — Super FX, SA-1, a DSP, a decompressor — living on the bus beside the ROM. Covered in Part II.' },
     { id: 'cic', label: 'CIC lockout', tag: 'region lock', col: PAL.violet,
-      desc: 'A tiny microcontroller that handshakes with a twin chip in the console every frame. Fail the handshake and the console is held in reset — this is the region/authentication lock.' },
+      desc: 'A tiny 4-bit microcontroller in a 16/18-pin package (F411/F413 family) that runs in lockstep with a twin chip in the console, both generating the same seeded bit-stream continuously; any mismatch holds the console in reset. Its keys separate NTSC from PAL — US and Japanese machines share the same NTSC CIC.' },
     { id: 'edge', label: 'Edge connector', tag: 'the bus', col: '#58b7f0',
       desc: 'The gold fingers that carry A0–A23, D0–D7, the strobes and clocks — the doorway between everything on this board and the CPU.' },
   ];
@@ -558,8 +558,12 @@ function MapsLab(root) {
   function parseHex(s) { const n = parseInt((s || '').replace(/[^0-9a-fA-F]/g, ''), 16); return isNaN(n) ? 0 : n; }
 
   function offToAddr(off) {
+    if (off >= 0x400000) return null;              // ≥ 4 MB: no simple LoROM/HiROM mapping — warn, don't wrap
     if (map === 'lorom') {
-      const bank = (off >> 15) & 0x7F;
+      let bank = (off >> 15) & 0x7F;
+      // CPU banks $7E/$7F are the console's WRAM, never cartridge ROM —
+      // these offsets appear at the $FE/$FF mirror instead (set bit 7)
+      if (bank >= 0x7E) bank |= 0x80;
       const addr = 0x8000 | (off & 0x7FFF);
       return (bank << 16) | addr;
     } else {
@@ -569,6 +573,7 @@ function MapsLab(root) {
   }
   function addrToOff(a) {
     const bank = (a >> 16) & 0xFF, o = a & 0xFFFF;
+    if (bank === 0x7E || bank === 0x7F) return 'wram';   // WRAM banks under both maps
     if (map === 'lorom') {
       if (o < 0x8000) return null;                 // lower half isn't ROM in LoROM
       return ((bank & 0x7F) << 15) | (o & 0x7FFF);
@@ -580,13 +585,16 @@ function MapsLab(root) {
 
   function recalc() {
     const off = parseHex(offIn.value);
-    addrOut.textContent = '$' + hex(offToAddr(off) & 0xFFFFFF, 6);
+    const addr = offToAddr(off);
+    addrOut.textContent = addr === null ? '⚠ ≥ 4 MB — no simple map' : '$' + hex(addr & 0xFFFFFF, 6);
     const a = parseHex(addrIn.value);
     const o = addrToOff(a);
-    offOut.textContent = o === null ? 'not ROM here' : '$' + hex(o, 6);
+    offOut.textContent = o === 'wram' ? 'not ROM here — WRAM'
+      : o === null ? 'not ROM here'
+        : '$' + hex(o, 6);
     note.textContent = map === 'lorom'
-      ? 'LoROM: 32 KB of ROM at $8000–$FFFF of each bank; file offset = (bank·$8000)+(addr−$8000).'
-      : 'HiROM: full 64 KB banks from $C0; file offset = (bank·$10000)+addr, bank counted from $C0.';
+      ? 'LoROM: 32 KB of ROM at $8000–$FFFF of each bank; file offset = (bank·$8000)+(addr−$8000). Banks $7E/$7F are WRAM — those slabs surface at $FE/$FF instead. Offsets ≥ 4 MB need ExHiROM-style mapping.'
+      : 'HiROM: full 64 KB banks at $C0–$FF (also visible at $40–$7D); file offset = (bank·$10000)+addr, bank counted from $C0. Banks $7E/$7F are WRAM. Offsets ≥ 4 MB need ExHiROM.';
   }
 
   offIn.addEventListener('input', recalc);
@@ -599,8 +607,8 @@ function MapsLab(root) {
    Lab 07 — SRAM map + real-time-clock explorer
    ========================================================================== */
 function SaveLab(root) {
-  const SIZES = [2, 16, 64, 128, 256];    // Kbit options
-  let idx = 3, map = 'lorom', rtc = false;
+  const SIZES = [16, 64, 128, 256];    // Kbit options (real carts bottom out at 16 Kbit / 2 KB)
+  let idx = 2, map = 'lorom', rtc = false;
   const winEl = root.querySelector('[data-save-window]');
   const bytesEl = root.querySelector('[data-save-bytes]');
   const sizeVal = root.querySelector('#save-size-val');
@@ -624,7 +632,7 @@ function SaveLab(root) {
     if (sizeVal) sizeVal.textContent = kbit + ' Kbit';
     winEl.textContent = map === 'lorom'
       ? 'banks $70–$7D · $0000–$7FFF'
-      : 'banks $20–$3F · $6000–$7FFF';
+      : 'banks $20–$3F / $A0–$BF · $6000–$7FFF';
     rtcChip.classList.toggle('good', rtc);
   }
 
@@ -652,13 +660,16 @@ function CatalogLab(root) {
     { chip: 'SA-1', cat: 'accelerator', clock: 10.7, role: 'A second 65816 with fast RAM — logic, AI, decompression', games: 'Super Mario RPG, Kirby Super Star' },
     { chip: 'DSP-1 (µPD77C25)', cat: 'math', clock: 8.0, role: 'Fixed-point matrix/vector/trig for Mode 7 & 3D projection', games: 'Pilotwings, Super Mario Kart' },
     { chip: 'DSP-2', cat: 'math', clock: 8.0, role: 'Bitmap conversion & scaling variant of the µPD77C25', games: 'Dungeon Master' },
+    { chip: 'DSP-3', cat: 'math', clock: 8.0, role: 'Bitplane conversion & data-shuffling variant of the µPD77C25', games: 'SD Gundam GX' },
     { chip: 'DSP-4', cat: 'math', clock: 8.0, role: 'Road/track projection math variant', games: "Top Gear 3000" },
     { chip: 'S-DD1', cat: 'compression', clock: 21.4, role: 'Real-time graphics decompression on the fly', games: 'Star Ocean, SF Alpha 2' },
     { chip: 'SPC7110', cat: 'compression', clock: 21.4, role: 'Data decompression + real-time clock', games: 'Far East of Eden Zero' },
     { chip: 'CX4', cat: 'math', clock: 20.0, role: 'Capcom trig/wireframe math for effects', games: 'Mega Man X2, X3' },
-    { chip: 'OBC1', cat: 'other', clock: 0, role: 'Sprite/OAM management helper', games: 'Metal Combat' },
+    { chip: 'OBC1', cat: 'other', clock: 0, role: 'Sprite/OAM management helper — shipped in exactly one game', games: "Metal Combat: Falcon's Revenge" },
     { chip: 'S-RTC', cat: 'other', clock: 0, role: 'Stand-alone real-time clock chip', games: 'Daikaijuu Monogatari II' },
     { chip: 'ST010 (DSP)', cat: 'math', clock: 11.0, role: 'µPD96050 math coprocessor variant', games: 'F1 ROC II' },
+    { chip: 'ST011 (DSP)', cat: 'math', clock: 15.0, role: 'µPD96050 variant crunching shogi-AI board math', games: 'Hayazashi Nidan Morita Shougi' },
+    { chip: 'ST018', cat: 'accelerator', clock: 21.4, role: 'A 32-bit ARM CPU core on the cartridge running shogi AI', games: 'Hayazashi Nidan Morita Shougi 2' },
   ];
   const tbody = root.querySelector('[data-cat-body]');
   let filter = 'all', sortKey = 'chip', sortDir = 1;
@@ -1051,13 +1062,13 @@ function DecompLab(root) {
 function HeaderLab(root) {
   // sample carts: [title, mapByte $FFD5, chipByte $FFD6, romSz $FFD7, ramSz $FFD8, country $FFD9]
   const SAMPLES = {
-    smw: ['SUPER MARIOWORLD', 0x20, 0x02, 0x09, 0x03, 0x01],
+    smw: ['SUPER MARIOWORLD', 0x20, 0x02, 0x09, 0x01, 0x01],
     zelda: ['THE LEGEND OF ZELDA', 0x20, 0x02, 0x0A, 0x03, 0x01],
-    starfox: ['STAR FOX', 0x20, 0x15, 0x0A, 0x05, 0x01],
-    mariorpg: ['Super Mario RPG', 0x23, 0x35, 0x0C, 0x06, 0x01],
+    starfox: ['STAR FOX', 0x20, 0x14, 0x0A, 0x05, 0x01],       // GSU + RAM, no battery
+    mariorpg: ['Super Mario RPG', 0x23, 0x35, 0x0C, 0x05, 0x01], // SA-1 + RAM + battery, 32 KB
     pilotwings: ['PILOTWINGS', 0x20, 0x03, 0x09, 0x00, 0x01],
   };
-  const MAPS = { 0x20: 'LoROM', 0x21: 'HiROM', 0x22: 'LoROM (SA-1 sram)', 0x23: 'SA-1 ROM', 0x25: 'ExHiROM', 0x30: 'LoROM+FastROM', 0x31: 'HiROM+FastROM' };
+  const MAPS = { 0x20: 'LoROM', 0x21: 'HiROM', 0x22: 'LoROM (S-DD1)', 0x23: 'SA-1 ROM', 0x25: 'ExHiROM', 0x30: 'LoROM+FastROM', 0x31: 'HiROM+FastROM' };
   const COPRO = { 0x0: 'DSP', 0x1: 'GSU (Super FX)', 0x2: 'OBC1', 0x3: 'SA-1', 0x4: 'S-DD1', 0x5: 'S-RTC', 0xE: 'Other (CX4/SPC7110)', 0xF: 'Custom' };
   const COUNTRY = { 0x00: 'Japan (NTSC)', 0x01: 'USA (NTSC)', 0x02: 'Europe (PAL)', 0x03: 'Sweden (PAL)', 0x06: 'France (PAL)' };
 
@@ -1093,10 +1104,10 @@ function HeaderLab(root) {
     H[0x1E] = cksum & 0xFF; H[0x1F] = (cksum >> 8) & 0xFF;
 
     const map = MAPS[mapB] || 'unknown ($' + hex(mapB) + ')';
-    const fast = (mapB & 0x10) ? 'FastROM (120 ns)' : 'SlowRAM (200 ns)';
+    const fast = (mapB & 0x10) ? 'FastROM (120 ns)' : 'SlowROM (200 ns)';
     const low = chipB & 0x0F, high = (chipB >> 4) & 0x0F;
     const hasCo = low >= 0x3;
-    const hasRam = low === 1 || low === 2 || low >= 4;
+    const hasRam = low === 1 || low === 2 || low === 4 || low === 5;  // low nibble 6 = copro+battery, no RAM
     const hasBatt = low === 2 || low === 5 || low === 6;
     const copro = hasCo ? (COPRO[high] || 'unknown') : 'none';
     const romKB = 1 << romB;               // 2^romB KB
@@ -1122,7 +1133,9 @@ function HeaderLab(root) {
       return '<div class="' + cls + '"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
     }).join('');
 
-    // hex strip $FFC0..$FFDF, highlight the decoded bytes
+    // hex strip $FFC0..$FFDF, highlight the decoded bytes and label a few
+    // inline so the strip is readable without the table above
+    const LABELS = { 0x00: 'title→', 0x15: '←map', 0x16: '←chip', 0x17: '←ROM sz', 0x18: '←RAM sz', 0x1E: '←cksum' };
     let html = smc ? '<b>[+512 SMC]</b>  ' : '';
     html += '$FFC0: ';
     for (let i = 0; i < 32; i++) {
@@ -1131,7 +1144,9 @@ function HeaderLab(root) {
       if (i === 0x15) cls = 'hl-map';
       else if (i === 0x16) cls = 'hl-chip';
       else if (i === 0x17 || i === 0x18) cls = 'hl-size';
+      if (i === 0x00) html += '<span class="blab">' + LABELS[0x00] + '</span>';
       html += cls ? '<span class="' + cls + '">' + b + '</span> ' : b + ' ';
+      if (LABELS[i] && i !== 0x00) html += '<span class="blab">' + LABELS[i] + '</span> ';
     }
     strip.innerHTML = html;
   }

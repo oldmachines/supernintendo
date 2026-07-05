@@ -1028,6 +1028,7 @@ tbody tr.dim { opacity: .28; }
 .hexstrip .hl-map { color: var(--amber); background: rgba(255,177,78,.14); border-radius: 3px; padding: 0 2px; }
 .hexstrip .hl-chip { color: var(--magenta); background: rgba(255,95,158,.14); border-radius: 3px; padding: 0 2px; }
 .hexstrip .hl-size { color: var(--violet); background: rgba(168,132,255,.16); border-radius: 3px; padding: 0 2px; }
+.hexstrip .blab { color: var(--muted); font-size: 9.5px; letter-spacing: .02em; font-weight: 500; }
 
 /* two-column translator layout (LoROM/HiROM lab) */
 .xlate { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; }

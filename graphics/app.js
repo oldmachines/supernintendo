@@ -126,8 +126,8 @@ function PixelLab(root) {
     }
     ctx.strokeStyle = 'rgba(57,47,87,0.9)'; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, size, size);
     canvas.__geo = { x0, y0, cell };
-    const bytes = N * N * 2;                     // 15-bit colour ≈ 2 bytes/pixel
-    info.innerHTML = '<b>' + N + ' × ' + N + '</b> = ' + (N * N) + ' pixels · at 2 bytes each that is <b>'
+    const bytes = N * N;                         // indexed colour: 1 byte/pixel is plenty for 8 palette entries
+    info.innerHTML = '<b>' + N + ' × ' + N + '</b> = ' + (N * N) + ' pixels · stored as palette indices (1 byte each) that is <b>'
       + (bytes >= 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B') + '</b> · pick a colour and drag to paint';
   }
 
@@ -591,7 +591,7 @@ function BeamLab(root) {
   const speedV = root.querySelector('[data-beam-speed-val]');
   const playBtn = root.querySelector('[data-beam-play]');
   const info = root.querySelector('[data-beam-info]');
-  const VW = 256, VH = 224, TOTL = 262, TOTD = 340;    // NTSC: 262 lines, 340 dots
+  const VW = 256, VH = 224, TOTL = 262, TOTD = 341;    // NTSC: 262 lines of 341 dots
   let playing = !REDUCED, visible = false, raf = null, last = 0;
   let dot = 0, line = 0;
   /* a simple scene to reveal as the beam paints it */
@@ -640,7 +640,7 @@ function BeamLab(root) {
       + ' · ' + (blanking ? '<span class="a">BLANKING — safe to write VRAM/CGRAM/OAM</span>' : '<span class="m">active display — VRAM writes forbidden</span>');
   }
   function step(dt) {
-    dot += dt * 340 * (+speedR.value);
+    dot += dt * 341 * (+speedR.value);
     while (dot >= TOTD) { dot -= TOTD; line++; if (line >= TOTL) line = 0; }
   }
   function frame(ts) {
@@ -675,8 +675,8 @@ function ModeLab(root) {
     2: { layers: [['BG1', 4, 16], ['BG2', 4, 16]], note: 'Like Mode 1 minus BG3, but adds offset-per-tile: BG3 supplies per-column scroll offsets for BG1/BG2.' },
     3: { layers: [['BG1', 8, 256], ['BG2', 4, 16]], note: 'BG1 becomes a full 256-colour layer — lush backdrops, at the cost of VRAM and layer count.' },
     4: { layers: [['BG1', 8, 256], ['BG2', 2, 4]], note: '256-colour BG1 with a cheap BG2, plus offset-per-tile like Mode 2.' },
-    5: { layers: [['BG1', 4, 16], ['BG2', 2, 4]], note: 'Hi-res: 512 pixels across (pseudo-hi-res). Used for sharper interfaces and some effects.' },
-    6: { layers: [['BG1', 4, 16]], note: 'Hi-res single layer with offset-per-tile. Rare, specialised.' },
+    5: { layers: [['BG1', 4, 16], ['BG2', 2, 4]], note: 'True hi-res: the PPU really fetches and outputs 512 pixels across. (Pseudo-hi-res is a different trick — a $2133 setting that interleaves main and sub screens in any mode.) Used for sharp text and interfaces.' },
+    6: { layers: [['BG1', 4, 16]], note: 'True hi-res single layer with offset-per-tile. Rare, specialised — double the fetch cost, and consumer CRTs blurred the extra columns anyway.' },
   };
   const COL = { 4: '#45e4d1', 16: '#a884ff', 256: '#ff5f9e' };
   function render(m) {
@@ -767,7 +767,8 @@ function Mode7Lab(root) {
     ctx.drawImage(off, (W - OW * scale) / 2, (H - OH * scale) / 2, OW * scale, OH * scale);
     const fx = v => { const s = v < 0 ? '-' : ''; return s + (Math.abs(v) * 256 | 0); };
     info.innerHTML = 'affine matrix (1.7.8 fixed-point) · A=<b>' + fx(A) + '</b> B=<b>' + fx(B)
-      + '</b> C=<b>' + fx(C) + '</b> D=<b>' + fx(D) + '</b> at $211B–$211E' + (persp ? ' · <span class="a">per-scanline HDMA perspective ON</span>' : '');
+      + '</b> C=<b>' + fx(C) + '</b> D=<b>' + fx(D) + '</b> at $211B–$211E' + (persp ? ' · <span class="a">per-scanline HDMA perspective ON</span>' : '')
+      + '<br>note the values shrink as you zoom in (A = cos ÷ zoom) · this lab’s 128×128-px texture stands in for the real 1024×1024-px (128×128-tile) map';
   }
   function frame(ts) {
     raf = null;
@@ -818,13 +819,15 @@ function ObjLab(root) {
       else { x = s.x0 + Math.sin(phase + s.ph) * 20; y = s.y0 + Math.cos(phase * 0.7 + s.ph) * 12; }
       return { x: clamp(x, 0, VW - 16), y: clamp(y, 0, VH - 16), hue: s.hue };
     });
-    /* per-scanline 32-sprite / 34-tile limit: each 16×16 sprite = 2 tiles wide covers 2 tile-columns */
-    let overLines = 0, maxOnLine = 0;
+    /* per-scanline 32-sprite / 34-sliver limit: each 16×16 sprite is 2 slivers (8-px slices) wide,
+       so the sliver budget runs out first — at the 18th sprite on a line (17 × 2 = 34). */
+    let rangeLines = 0, timeLines = 0, maxOnLine = 0;
     const drawn = new Set();
     for (let ln = 0; ln < VH; ln++) {
       const onLine = [];
       pos.forEach((p, idx) => { if (ln >= p.y && ln < p.y + 16) onLine.push(idx); });
-      if (onLine.length > 32) overLines++;
+      if (onLine.length > 32) rangeLines++;                 // range-over: >32 sprites evaluated
+      if (onLine.length * 2 > 34) timeLines++;              // time-over: >34 slivers needed
       maxOnLine = Math.max(maxOnLine, onLine.length);
       let tiles = 0, shown = 0;
       for (const idx of onLine) {
@@ -842,8 +845,14 @@ function ObjLab(root) {
       }
     });
     ctx.strokeStyle = 'rgba(57,47,87,0.9)'; ctx.lineWidth = 1; ctx.strokeRect(ox, oy, VW * scale, VH * scale);
-    info.innerHTML = '<b>' + sprites.length + '</b> sprites · busiest scanline holds <b>' + maxOnLine + '</b> · '
-      + (overLines ? '<span class="m">' + overLines + ' scanlines over the 32-sprite limit → dropouts (flicker)</span>' : '<span class="a">under the 32-sprite / 34-tile limit — all shown</span>');
+    info.innerHTML = '<b>' + sprites.length + '</b> sprites (16×16 = 2 slivers each) · busiest scanline holds <b>' + maxOnLine + '</b> · '
+      + ((rangeLines || timeLines)
+        ? '<span class="m">'
+          + (timeLines ? timeLines + ' scanlines over the 34-sliver fetch budget (time-over) → dropouts (flicker)' : '')
+          + (timeLines && rangeLines ? ' · ' : '')
+          + (rangeLines ? rangeLines + ' scanlines over the 32-sprite limit (range-over)' : '')
+          + '</span>'
+        : '<span class="a">within both limits — 32 sprites / 34 slivers per line — all shown</span>');
   }
   function frame(ts) {
     raf = null; if (!last) last = ts; phase += (ts - last) / 1000 * 1.2; last = ts;
@@ -1010,31 +1019,40 @@ function VramLab(root) {
 
 /* ==========================================================================
    Module 15 — per-dot vs per-scanline
-   A raster effect whose split point moves within each scanline (an HDMA-driven
-   mid-line register change). A per-dot renderer follows the curve; a
-   per-scanline renderer can only latch one value per line and stair-steps it.
+   The simulated game's CPU rewrites a colour-boundary register continuously
+   through the frame — including in the middle of each visible line (this is
+   deliberately NOT HDMA, which fires only between lines and would look the
+   same in both panels). The register's value is a function of the beam's
+   absolute dot-time T = line*341 + dot, oscillating faster than once per line.
+   A per-dot renderer applies each write at the dot it lands, painting slanted
+   bands; a per-scanline renderer only samples the register at each line's
+   start, so the mid-line writes are invisible and only a single wavy boundary
+   per line survives.
    ========================================================================== */
 function EmulateLab(root) {
   const cA = root.querySelector('[data-em-dot]');
   const cB = root.querySelector('[data-em-line]');
   const ctxA = cA.getContext('2d'), ctxB = cB.getContext('2d');
   const info = root.querySelector('[data-em-info]');
-  const VW = 200, VH = 150;
+  const VW = 200, VH = 150, DOTS = 341;         // 341 dot-clocks per line, ~200 visible here
+  const EM_MSG = 'the same CPU-timed writes landing mid-line (not HDMA — that would look identical in both panels) · <b>per-dot</b> applies each write at the exact dot it lands · <span class="m">per-scanline</span> samples only at each line\'s start, so the mid-line detail collapses';
   let visible = false, raf = null, t = 0, last = 0;
-  function split(y, time) {
-    // the register value the game rewrites mid-scanline; here: a moving boundary
-    return VW / 2 + Math.sin(y * 0.06 + time) * VW * 0.32;
+  function regValue(T, time) {
+    // the register value at absolute dot-time T: the CPU rewrites it many times
+    // per line, so it swings noticeably WITHIN each visible line (period ≈ 0.8 lines)
+    return VW / 2 + Math.sin(T * 0.0237 + time) * VW * 0.32;
   }
   function render(canvas, cctx, perDot) {
-    const im = cctx.createImageData ? null : null;
     const off = canvas.__off || (canvas.__off = document.createElement('canvas'));
     off.width = VW; off.height = VH;
     const octx = off.getContext('2d');
     const data = octx.createImageData(VW, VH);
     const d = data.data;
     for (let y = 0; y < VH; y++) {
-      const boundary = perDot ? split(y, t) : split(y - (y % 8) + 4, t); // per-scanline: one latch per (coarse) line group
+      const lineStart = regValue(y * DOTS, t);   // what a per-scanline renderer latches
       for (let x = 0; x < VW; x++) {
+        // per-dot: sample the register at this exact dot; per-scanline: reuse the latch
+        const boundary = perDot ? regValue(y * DOTS + x, t) : lineStart;
         const left = x < boundary;
         const i = (y * VW + x) * 4;
         const c = left ? PAL16[10] : PAL16[6];
@@ -1051,13 +1069,14 @@ function EmulateLab(root) {
   function frame(ts) {
     raf = null; if (!last) last = ts; t += (ts - last) / 1000 * 1.3; last = ts;
     render(cA, ctxA, true); render(cB, ctxB, false);
-    info.innerHTML = 'both render the same mid-scanline register change · <b>per-dot</b> follows the boundary smoothly · <span class="m">per-scanline</span> latches one value per line group and stair-steps it';
+    info.innerHTML = EM_MSG;
     if (visible && !REDUCED) raf = requestAnimationFrame(frame);
   }
   function kick() { if (visible && !raf) { last = 0; if (REDUCED) { render(cA, ctxA, true); render(cB, ctxB, false); } else raf = requestAnimationFrame(frame); } }
   whenVisible(root, v => { visible = v; kick(); });
   window.addEventListener('resize', () => { render(cA, ctxA, true); render(cB, ctxB, false); });
   render(cA, ctxA, true); render(cB, ctxB, false);
+  info.innerHTML = EM_MSG;
 }
 
 /* ------------------------------------------------------- hero ambient ----- */

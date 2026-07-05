@@ -130,7 +130,7 @@ function ToyCpuLab(root) {
         4: 'opcode 4 = <b>JMP</b>: set the PC to ' + n + '.',
       };
       narrate('<b>Decode.</b> ' + th2(ir) + ' splits into opcode <b>' + op +
-        '</b> and operand <b>' + n + '</b> — ' + (words[op] || 'not a known opcode; a real CPU would fault.'));
+        '</b> and operand <b>' + n + '</b> — ' + (words[op] || 'not an opcode our toy knows. (A real 65816 defines all 256 opcode values — there is no fault; it would just do something unhelpful but well-defined.)'));
       phase = 2;
       render({ reg: 'ir', lit: 1 });
     } else {                                             // EXECUTE
@@ -565,9 +565,9 @@ function StackLab(root) {
 
 /* ==========================================================================
    Module 06 — interrupt / timing beam
-   One NTSC frame: 262 scanlines, 0–223 visible, 224–261 in V-blank. A beam
-   sweeps top to bottom; NMI fires the instant V-blank begins. A side panel
-   converts the master clock into the three CPU memory-access speeds.
+   One NTSC frame: 262 scanlines, 0–224 visible, V-blank from line 225 to 261.
+   A beam sweeps top to bottom; NMI fires the instant V-blank begins. A side
+   panel converts the master clock into the three CPU memory-access speeds.
    ========================================================================== */
 function TimingLab(root) {
   const canvas = root.querySelector('.timing-canvas');
@@ -728,8 +728,10 @@ function WidthLab(root) {
   function refresh() {
     mBtn.classList.toggle('on', M === 0);
     xBtn.classList.toggle('on', X === 0);
-    mBtn.querySelector('.fs').textContent = M ? '8-bit' : '16-bit';
-    xBtn.querySelector('.fs').textContent = X ? '8-bit' : '16-bit';
+    // show the real flag value next to the width, so the M=1 → 8-bit polarity
+    // is visible rather than implied by the lit/unlit styling alone
+    mBtn.querySelector('.fs').textContent = M ? 'M=1 · 8-bit' : 'M=0 · 16-bit';
+    xBtn.querySelector('.fs').textContent = X ? 'X=1 · 8-bit' : 'X=0 · 16-bit';
     build();
   }
 
@@ -759,9 +761,9 @@ function MemMapLab(root) {
     }
     const sys = (bank <= 0x3F) || (bank >= 0x80 && bank <= 0xBF);
     if (sys) {
-      if (off <= 0x1FFF) return { name: 'WRAM mirror', color: C.cyan, detail: 'The first 8 KB of $7E (LowRAM), mirrored into the bottom of every system bank so zero-page code reaches it fast.', tag: 'mirror of $7E:0000–1FFF' };
+      if (off <= 0x1FFF) return { name: 'WRAM mirror', color: C.cyan, detail: 'The first 8 KB of $7E (LowRAM), mirrored into the bottom of every system bank — so code reaches it with short direct-page operands and DBR-free absolute addresses (same 8-cycle speed as $7E).', tag: 'mirror of $7E:0000–1FFF' };
       if (off >= 0x2100 && off <= 0x213F) return { name: 'PPU registers', color: C.violet, detail: '$2100 INIDISP through the $2139/$213A read ports — the Picture Processing Unit: screen, sprites, VRAM, palette.', tag: 'PPU $2100–$213F' };
-      if (off >= 0x2140 && off <= 0x2143) return { name: 'APU I/O ports', color: C.magenta, detail: 'Four mailbox ports to the SPC700 sound CPU. The famous boot handshake happens here (Module 14).', tag: 'APU $2140–$2143' };
+      if (off >= 0x2140 && off <= 0x217F) return { name: 'APU I/O ports', color: C.magenta, detail: 'Four mailbox ports to the SPC700 sound CPU ($2140–$2143), mirrored every 4 bytes up to $217F. The famous boot handshake happens here (Module 14).', tag: 'APU $2140–$217F (mirrors)' };
       if (off >= 0x2180 && off <= 0x2183) return { name: 'WRAM port', color: C.cyan, detail: '$2180 data plus $2181–$2183 address — a moving window the CPU uses to reach all 128 KB of WRAM.', tag: 'WMDATA / WMADD' };
       if (off >= 0x4016 && off <= 0x4017) return { name: 'Joypad (serial)', color: C.amber, detail: '$4016/$4017 — the old-style bit-banged controller ports. This region runs at the slow 1.79 MHz I/O speed.', tag: 'slow I/O' };
       if (off >= 0x4200 && off <= 0x421F) return { name: 'CPU registers', color: C.amber, detail: '$4200 NMITIMEN, $4202/03 multiply, $4204–06 divide, $420B MDMAEN, $420C HDMAEN, $4210 RDNMI, $4212 HVBJOY…', tag: 'CPU $4200–$421F' };
@@ -779,7 +781,8 @@ function MemMapLab(root) {
     { a: 0x2000, b: 0x20FF, name: '', color: C.muted },
     { a: 0x2100, b: 0x213F, name: 'PPU', color: C.violet },
     { a: 0x2140, b: 0x217F, name: 'APU', color: C.magenta },
-    { a: 0x2180, b: 0x3FFF, name: '', color: C.muted },
+    { a: 0x2180, b: 0x2183, name: '', color: C.cyan },      // WRAM port — sliver, but keeps bar & classifier agreeing
+    { a: 0x2184, b: 0x3FFF, name: '', color: C.muted },
     { a: 0x4000, b: 0x41FF, name: 'pad', color: C.amber },
     { a: 0x4200, b: 0x42FF, name: 'CPU', color: C.amber },
     { a: 0x4300, b: 0x437F, name: 'DMA', color: C.violet },
@@ -846,9 +849,23 @@ function DmaLab(root) {
 
   const MODES = {
     '0': { name: 'mode 0 · 1×1', ports: 1 },
-    '1': { name: 'mode 1 · 2×1 ($2118/$2119)', ports: 2 },
+    '1': { name: 'mode 1 · 2×1', ports: 2 },
     '2': { name: 'mode 2 · 1×2', ports: 1 },
   };
+
+  /* keep the transfer-pattern labels honest: mode 1 writes the chosen B-bus
+     port and the next one up, so the pair shown must track the destination
+     (e.g. $2118/9 for VRAM, $2122/3 for CGRAM) rather than always "$2118/9". */
+  function updateModeLabels() {
+    const d = destSel.value;                                  // e.g. "$2118"
+    const last = parseInt(d.slice(-1), 16);
+    const pair = d + '/' + ((last + 1) & 0xf).toString(16).toUpperCase();
+    [...modeSel.options].forEach(o => {
+      if (o.value === '1') o.textContent = 'mode 1 · 2 regs (' + pair + ')';
+      if (o.value === '0') o.textContent = 'mode 0 · 1 reg (' + d + ')';
+      if (o.value === '2') o.textContent = 'mode 2 · 1 reg ×2 (' + d + ')';
+    });
+  }
 
   function draw() {
     const { ctx, W, H, dpr } = fitCanvas(canvas);
@@ -929,20 +946,22 @@ function DmaLab(root) {
   }
 
   cntR.addEventListener('input', () => { cntV.textContent = cntR.value + ' bytes'; sent = 0; stats(); draw(); });
-  destSel.addEventListener('change', draw);
+  destSel.addEventListener('change', () => { updateModeLabels(); draw(); });
   modeSel.addEventListener('change', draw);
   runBtn.addEventListener('click', run);
   window.addEventListener('resize', draw);
   whenVisible(root, () => { visible = true; draw(); }, () => { visible = false; running = false; if (raf) cancelAnimationFrame(raf); });
   cntV.textContent = cntR.value + ' bytes';
+  updateModeLabels();
   stats(); draw();
 }
 
 /* ==========================================================================
    Module 11 — HDMA gradient painter
-   Each scanline, HDMA writes one colour value to a PPU register ($2132). Feed
-   it a two-colour table and it paints a smooth vertical gradient — the trick
-   behind SNES skies. The beam fills line by line so you can watch it happen.
+   Each scanline, HDMA writes one colour value to a PPU register ($2132). With
+   repeat-mode table entries (line-count top bit set) it delivers a fresh value
+   every line and paints a smooth vertical gradient — the trick behind SNES
+   skies. The beam fills line by line so you can watch it happen.
    ========================================================================== */
 function HdmaLab(root) {
   const canvas = root.querySelector('.hdma-canvas');
@@ -963,13 +982,15 @@ function HdmaLab(root) {
   }
 
   function drawTable() {
-    // show a handful of representative HDMA table entries (line-count, value)
+    // The table shown must be the one this smooth gradient actually needs:
+    // repeat-mode entries (top bit set), delivering a fresh colour EVERY line.
+    // Hold-mode entries ($01–$80) would paint bands, not a fade.
+    // 224 lines = 127 ($FF & $7F) + 97 ($E1 & $7F).
     tblEl.innerHTML = '';
     const rows = [
-      ['#$20', 'value A', 'repeat this colour for 32 lines'],
-      ['#$20', 'value B', 'next 32 lines, one step brighter'],
-      ['#$20', 'value C', '…and so on down the screen'],
-      ['#$00', '—', 'a $00 line-count byte ends the table'],
+      ['$FF', '127 colour bytes follow', 'repeat mode (top bit set): write a fresh value on EVERY line, for $7F = 127 lines'],
+      ['$E1', '97 more colour bytes', 'repeat again: $E1 & $7F = 97 lines — 127 + 97 = all 224 lines of the frame'],
+      ['$00', '—', 'a $00 line-count byte ends the table'],
     ];
     rows.forEach(([lc, v, note]) => {
       const d = document.createElement('div');

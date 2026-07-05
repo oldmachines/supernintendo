@@ -200,6 +200,24 @@
             That's what "random access" means.
           </p>
 
+          <div class="note hw">
+            <div class="ico">$</div>
+            <div>
+              <p>
+                <strong>How to read the numbers on this page.</strong> A leading
+                <code>$</code> means a number is written in
+                <span class="term" data-tip="Base 16 — digits 0–9 then A–F. Two hex digits describe exactly one byte, which is why hardware people love it.">hexadecimal</span>
+                (base 16, digits 0–9 then A–F); a leading <code>%</code> means
+                binary (base 2). They're just different spellings of the same
+                value. One worked example: <code>$42</code> is 4×16&nbsp;+&nbsp;2
+                = <strong>66</strong> in everyday decimal, which in binary is
+                <code>%0100&nbsp;0010</code>. And a <strong>byte is 8 bits</strong> —
+                eight binary digits, one value from 0 to 255, exactly two hex
+                digits. That's why the data lines come in a bundle of eight.
+              </p>
+            </div>
+          </div>
+
           <figure class="figure">
             <svg viewBox="0 0 900 300" role="img" aria-label="A ROM: address lines enter a decoder which selects one cell in a storage array, whose byte is driven out onto the data lines">
               <defs><marker id="ah01" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
@@ -303,14 +321,24 @@
             <strong>address decoding</strong>, and its output is a set of
             <span class="term" data-tip="A signal, usually active-low (/CS), that switches exactly one memory device or register block onto the shared bus for a given address.">chip-select</span>
             signals — one per device, and never more than one active at a time.
+            One notation note before we go on: signal names written with a
+            leading slash, like <code>/CS</code> or <code>/CART</code>, are
+            <strong>active-low</strong> — the wire idles at a high voltage and
+            is pulled <em>low</em> to mean "yes, now." The slash is the
+            engineer's reminder that low is the active state.
           </p>
           <p>
             The decoder is just logic watching the <em>top</em> address lines.
             The low lines pick a byte <em>within</em> a device; the high lines
-            pick <em>which</em> device. On the Super&nbsp;Nintendo's 65816, a
-            memory access carries a 24-bit address split into an 8-bit
+            pick <em>which</em> device. On the Super&nbsp;Nintendo's processor —
+            a chip called the
+            <span class="term" data-tip="The WDC 65C816: the 16-bit CPU at the heart of the Super Nintendo, with a 24-bit address bus.">65816</span>
+            — a memory access carries a 24-bit address split into an 8-bit
             <span class="term" data-tip="The high 8 bits of a 24-bit SNES address (A16–A23). It selects one of 256 64 KB banks.">bank</span>
-            number and a 16-bit offset within that bank. Inside the ordinary
+            number and a 16-bit offset within that bank. Written out, an
+            address like <code>$03:9C40</code> splits at the colon: bank
+            <code>$03</code> (the top 8 bits) and offset <code>$9C40</code>
+            (the low 16 bits) within that bank. Inside the ordinary
             "system" banks, the offset alone tells the decoder everything: low
             addresses map to work RAM, a middle window to the console's
             registers, and the top half of the bank (<code>$8000–$FFFF</code>)
@@ -331,6 +359,48 @@
               share a number, so mail never lands in two places at once.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 330" role="img" aria-label="Anatomy of a 24-bit SNES address: an 8-bit bank byte plus a 16-bit offset, above a strip of all 256 banks showing system banks, cartridge regions and the WRAM banks $7E–$7F">
+              <defs><marker id="ah02b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="30" y="28" class="d-tag">one 24-bit address, split at the colon — $03:9C40</text>
+              <!-- bank byte box -->
+              <rect x="30" y="44" width="190" height="64" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="125" y="72" text-anchor="middle" class="d-label d-violet" style="font-size:16px">$03</text>
+              <text x="125" y="94" text-anchor="middle" class="d-sub">bank — 8 bits (A23–A16)</text>
+              <!-- offset box -->
+              <rect x="230" y="44" width="380" height="64" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="420" y="72" text-anchor="middle" class="d-label d-cyan" style="font-size:16px">$9C40</text>
+              <text x="420" y="94" text-anchor="middle" class="d-sub">offset within the bank — 16 bits (A15–A0)</text>
+              <text x="630" y="70" class="d-sub">= building $03,</text>
+              <text x="630" y="88" class="d-sub">apartment $9C40</text>
+              <!-- 256-bank strip -->
+              <text x="30" y="152" class="d-tag">the 256 banks, $00 → $FF (each 64 KB)</text>
+              <g>
+                <rect x="30"  y="166" width="210" height="46" rx="4" class="d-fill-panel d-violet-s" stroke-width="1.2"/>
+                <text x="135" y="185" text-anchor="middle" class="d-sub d-violet">$00–$3F system</text>
+                <text x="135" y="201" text-anchor="middle" class="d-sub" style="font-size:9px">RAM/regs low · cart high</text>
+                <rect x="240" y="166" width="200" height="46" rx="4" class="d-fill-panel d-magenta-s" stroke-width="1.2"/>
+                <text x="340" y="185" text-anchor="middle" class="d-sub d-magenta">$40–$7D</text>
+                <text x="340" y="201" text-anchor="middle" class="d-sub" style="font-size:9px">cartridge regions</text>
+                <rect x="440" y="166" width="12" height="46" rx="2" fill="rgba(69,228,209,0.35)" class="d-cyan-s" stroke-width="1.4"/>
+                <rect x="452" y="166" width="208" height="46" rx="4" class="d-fill-panel d-violet-s" stroke-width="1.2"/>
+                <text x="556" y="185" text-anchor="middle" class="d-sub d-violet">$80–$BF system (fast mirror)</text>
+                <text x="556" y="201" text-anchor="middle" class="d-sub" style="font-size:9px">same picture again</text>
+                <rect x="660" y="166" width="210" height="46" rx="4" class="d-fill-panel d-magenta-s" stroke-width="1.2"/>
+                <text x="765" y="185" text-anchor="middle" class="d-sub d-magenta">$C0–$FF</text>
+                <text x="765" y="201" text-anchor="middle" class="d-sub" style="font-size:9px">cartridge regions</text>
+              </g>
+              <!-- WRAM callout -->
+              <line x1="446" y1="248" x2="446" y2="216" class="d-axis" stroke-width="1.4" marker-end="url(#ah02b)"/>
+              <text x="446" y="266" text-anchor="middle" class="d-sub d-cyan">banks $7E–$7F: the console's 128 KB WRAM — never the cartridge</text>
+              <!-- bank $03 pointer -->
+              <rect x="38" y="166" width="3.5" height="46" fill="#ffb14e"/>
+              <text x="32" y="232" class="d-sub d-amber">↑ bank $03 lives here</text>
+              <text x="30" y="306" class="d-flow">bank byte picks one of 256 buildings · 16-bit offset picks the byte inside · $7E–$7F are WRAM's private buildings</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>A 24-bit address, dissected.</strong> The top 8 bits are the <span class="term" data-tip="The high byte of a 24-bit address, selecting one of 256 64 KB banks.">bank</span>; the low 16 bits are the offset inside that 64 KB bank. Across all 256 banks: system banks at $00–$3F (repeated at $80–$BF), cartridge territory at $40–$7D and $C0–$FF, and the two banks $7E–$7F that belong to the console's work RAM. Module 06 fills this grid in properly.</figcaption>
+          </figure>
 
           <h4>Bank switching: reaching more than you can address</h4>
           <p>
@@ -359,8 +429,10 @@
               <text x="295" y="66" text-anchor="middle" class="d-sub d-violet">/IO — PPU / APU regs</text>
               <text x="295" y="82" text-anchor="middle" class="d-sub">$2000–$5FFF</text>
               <rect x="410" y="46" width="120" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
-              <text x="470" y="66" text-anchor="middle" class="d-sub d-amber">/SRAM</text>
-              <text x="470" y="82" text-anchor="middle" class="d-sub">$6000–$7FFF</text>
+              <text x="470" y="60" text-anchor="middle" class="d-sub d-amber" style="font-size:9.5px">expansion / SRAM</text>
+              <text x="470" y="73" text-anchor="middle" class="d-sub d-amber" style="font-size:9.5px">window (HiROM)</text>
+              <text x="470" y="87" text-anchor="middle" class="d-sub" style="font-size:9.5px">$6000–$7FFF</text>
+              <text x="470" y="112" text-anchor="middle" class="d-sub" style="font-size:10px">HiROM carts put save SRAM here (Module 07)</text>
               <rect x="530" y="46" width="340" height="46" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
               <text x="700" y="66" text-anchor="middle" class="d-sub d-magenta">/CART — cartridge ROM</text>
               <text x="700" y="82" text-anchor="middle" class="d-sub">$8000–$FFFF</text>
@@ -370,18 +442,20 @@
               <text x="105" y="171" text-anchor="middle" class="d-num">A15 A14 A13</text>
               <line x1="180" y1="167" x2="240" y2="167" class="d-axis" stroke-width="1.6"/>
               <text x="250" y="164" class="d-sub">000 → WRAM · 001–010 → I/O</text>
-              <text x="250" y="182" class="d-sub">011 → SRAM · 1xx → cartridge ROM</text>
+              <text x="250" y="182" class="d-sub">011 → expansion/SRAM · 1xx → cartridge ROM</text>
               <text x="30" y="222" class="d-flow">Only one chip-select is ever low at a time — no two devices fight for the data lines.</text>
             </svg>
-            <figcaption class="fig-cap"><strong>Chip-select decoding.</strong> The low address bits pick a byte inside a device; the high bits pick the device. In a system bank the top three lines split the 64 KB into work RAM, registers, an optional SRAM window and cartridge ROM — exactly one <span class="term" data-tip="The signal that switches a single device onto the shared bus.">chip-select</span> at a time.</figcaption>
+            <figcaption class="fig-cap"><strong>Chip-select decoding.</strong> The low address bits pick a byte inside a device; the high bits pick the device. In a system bank the top three lines split the 64 KB into work RAM, registers, an expansion window ($6000–$7FFF, where HiROM cartridges put their save SRAM — Module 07) and cartridge ROM — exactly one <span class="term" data-tip="The signal that switches a single device onto the shared bus.">chip-select</span> at a time.</figcaption>
           </figure>
 
           <p>
             The lab lets you sweep an address across one 64&nbsp;KB bank and watch
             the chip-selects fire. Notice how the top three address lines alone
-            decide the region — and that the cartridge only ever answers in the
-            upper half of the bank, the fact the LoROM map (Module 06) is built
-            on.
+            decide the region — and that in these <em>system</em> banks the
+            cartridge ROM only answers in the upper half. That upper-half-only
+            picture is exactly what the LoROM map (Module 06) is built on;
+            HiROM cartridges also claim other banks outright, as Module 06
+            shows.
           </p>
 
           <div class="lab" id="lab-decode">
@@ -434,7 +508,11 @@
             small <strong>static RAM</strong> chip with a <strong>battery</strong>
             wired to keep it awake. <span class="term" data-tip="Static RAM — read/write memory that holds its value with a trickle of current and no periodic refresh, as long as it stays powered.">SRAM</span>
             is ordinary read/write memory — volatile like any RAM — but it draws
-            almost nothing to <em>hold</em> a value once written. Pair it with a
+            almost nothing to <em>hold</em> a value once written. The
+            "static" is the point: the <em>dynamic</em> RAM in bigger computers
+            forgets its bits within milliseconds unless the machine constantly
+            refreshes them, while a static cell holds its bit for as long as any
+            power at all reaches it. Pair it with a
             3-volt lithium <span class="term" data-tip="A small lithium cell (like a watch battery) soldered onto the cartridge that keeps the save SRAM powered while the console is off.">coin cell</span>
             soldered onto the board, and the SRAM stays powered even when the
             console is unplugged. The save persists not because the memory is
@@ -470,7 +548,7 @@
               <text x="30" y="30" class="d-tag d-amber">Battery-backed SRAM (on the cartridge)</text>
               <rect x="30" y="44" width="360" height="70" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
               <text x="60" y="72" class="d-label" style="font-size:13px">SRAM</text>
-              <text x="60" y="94" class="d-sub">save data · 2–256 Kbit</text>
+              <text x="60" y="94" class="d-sub">save data · 16–256 Kbit</text>
               <circle cx="330" cy="79" r="22" fill="rgba(95,209,139,0.18)" stroke="#5fd18b" stroke-width="1.6"/>
               <text x="330" y="83" text-anchor="middle" class="d-sub" style="fill:#5fd18b">3V</text>
               <text x="30" y="138" class="d-sub" style="fill:#5fd18b">power off → coin cell keeps it lit → save survives ✓</text>
@@ -548,13 +626,19 @@
             address the CPU emits and answer it in real time.
           </p>
           <p>
-            Walk the pins. There are 24 <strong>address lines</strong> (A0–A23),
-            enough to name any byte in the 16&nbsp;MB space. There are 8
-            bidirectional <strong>data lines</strong> (D0–D7): the SNES moves one
-            byte at a time. There are the read and write strobes
-            (<code>/RD</code>, <code>/WR</code>) that say <em>when</em> and
+            Walk the pins. There are 24 bits' worth of <strong>address</strong> —
+            the sixteen offset lines A0–A15 plus eight <em>bank-address</em>
+            lines (BA0–BA7) that carry the bank byte — enough to name any byte
+            in the 16&nbsp;MB space. There are 8 <strong>data lines</strong>
+            (D0–D7): the SNES moves one byte at a time, and the lines are
+            <em>bidirectional</em> — the same eight wires carry a byte out of
+            the cartridge on a read and into it on a write. There are the read
+            and write <span class="term" data-tip="A short 'now!' pulse on a control wire that marks the exact instant a bus transfer is valid.">strobes</span>
+            (<code>/RD</code>, <code>/WR</code>) — a strobe is a brief timing
+            pulse that says <em>now</em> — telling the cartridge <em>when</em> and
             <em>which direction</em> an access goes; the cartridge chip-select
-            (<code>/CART</code>) from Module 02; the CPU clock (<code>φ2</code>)
+            (<code>/CART</code>) from Module 02; the CPU clock (<code>φ2</code>,
+            "phi-two" — the steady tick every bus access is timed against)
             so on-cart chips stay in step; a DRAM <code>/REFRESH</code> pulse;
             <code>/RESET</code> and <code>/IRQ</code>; audio lines routed through
             the connector; power and ground; and a few
@@ -586,11 +670,54 @@
             that walked through it.
           </p>
 
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="A simplified Game Pak edge connector strip with pins grouped and colour-coded: power, address lines A0–A15, bank-address lines BA0–BA7, data lines D0–D7, control strobes, clocks, audio and expansion pins">
+              <text x="30" y="28" class="d-tag d-amber">the edge connector, grouped — 46 pins (+16 more on chipped carts), simplified</text>
+              <!-- connector substrate -->
+              <rect x="30" y="44" width="840" height="86" rx="10" fill="rgba(255,206,106,0.07)" stroke="#ffb14e" stroke-width="1" stroke-opacity="0.4"/>
+              <!-- groups -->
+              <g>
+                <rect x="42"  y="58" width="52"  height="58" rx="5" fill="rgba(135,127,158,0.18)" class="d-stroke-line" stroke-width="1.2"/>
+                <text x="68" y="83" text-anchor="middle" class="d-sub">+5V</text>
+                <text x="68" y="99" text-anchor="middle" class="d-sub">GND</text>
+                <rect x="100" y="58" width="200" height="58" rx="5" fill="rgba(69,228,209,0.14)" class="d-cyan-s" stroke-width="1.3"/>
+                <text x="200" y="83" text-anchor="middle" class="d-sub d-cyan">A0 … A15</text>
+                <text x="200" y="99" text-anchor="middle" class="d-sub" style="font-size:9px">16-bit offset</text>
+                <rect x="306" y="58" width="110" height="58" rx="5" fill="rgba(69,228,209,0.22)" class="d-cyan-s" stroke-width="1.3"/>
+                <text x="361" y="83" text-anchor="middle" class="d-sub d-cyan">BA0 … BA7</text>
+                <text x="361" y="99" text-anchor="middle" class="d-sub" style="font-size:9px">bank byte</text>
+                <rect x="422" y="58" width="110" height="58" rx="5" fill="rgba(255,95,158,0.14)" class="d-magenta-s" stroke-width="1.3"/>
+                <text x="477" y="83" text-anchor="middle" class="d-sub d-magenta">D0 … D7</text>
+                <text x="477" y="99" text-anchor="middle" class="d-sub" style="font-size:9px">data, both ways</text>
+                <rect x="538" y="58" width="150" height="58" rx="5" fill="rgba(255,177,78,0.14)" class="d-amber-s" stroke-width="1.3"/>
+                <text x="613" y="80" text-anchor="middle" class="d-sub d-amber" style="font-size:9.5px">/RD /WR /CART</text>
+                <text x="613" y="95" text-anchor="middle" class="d-sub d-amber" style="font-size:9.5px">/RESET /IRQ /PARD</text>
+                <text x="613" y="110" text-anchor="middle" class="d-sub" style="font-size:9px">control</text>
+                <rect x="694" y="58" width="70" height="58" rx="5" fill="rgba(168,132,255,0.16)" class="d-violet-s" stroke-width="1.3"/>
+                <text x="729" y="83" text-anchor="middle" class="d-sub d-violet">φ2 · CLK</text>
+                <text x="729" y="99" text-anchor="middle" class="d-sub" style="font-size:9px">clocks</text>
+                <rect x="770" y="58" width="52" height="58" rx="5" fill="rgba(95,209,139,0.16)" stroke="#5fd18b" stroke-width="1.3"/>
+                <text x="796" y="83" text-anchor="middle" class="d-sub" style="fill:#5fd18b">L · R</text>
+                <text x="796" y="99" text-anchor="middle" class="d-sub" style="font-size:9px">audio</text>
+                <rect x="828" y="58" width="34" height="58" rx="5" fill="rgba(88,183,240,0.16)" stroke="#58b7f0" stroke-width="1.3"/>
+                <text x="845" y="83" text-anchor="middle" class="d-sub" style="fill:#58b7f0">EXP</text>
+              </g>
+              <!-- gold fingers row -->
+              <g fill="rgba(255,206,106,0.35)">
+                <rect x="42" y="140" width="820" height="10" rx="2" fill="rgba(255,206,106,0.14)"/>
+              </g>
+              <text x="42" y="176" class="d-flow">address in (A + BA) · data both ways (D) · strobes say when · clocks keep time · spare pins say "build something"</text>
+              <text x="42" y="200" class="d-flow">note: the real connector has no literal A16–A23 pins — the bank byte travels on its own BA0–BA7 contacts</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The bus, laid flat.</strong> A simplified map of the connector's signal groups: the 16 offset <span class="term" data-tip="Input wires carrying the low 16 bits of the address.">address lines</span> plus the eight BA0–BA7 pins that carry the <span class="term" data-tip="The high 8 bits of the 24-bit address, carried on dedicated bank-address pins.">bank byte</span>, the eight bidirectional data lines, the control strobes, clocks, audio pass-through and expansion pins. Hover the lab below to meet them one by one.</figcaption>
+          </figure>
+
           <p>
             The lab is a pin-by-pin explorer. Hover any contact on the edge
             connector to see what it carries and why it's there — the address and
-            data lines you already know, the strobes and clocks, and the humble
-            expansion pins that changed what a cartridge could be.
+            data lines you already know, the strobes and clocks, and the spare
+            expansion pins. (Remember though: the real superpower isn't any one
+            special pin — it's that the bus itself is here at all.)
           </p>
 
           <div class="lab" id="lab-pinout">
@@ -601,7 +728,7 @@
                 <div class="name" data-pin-name>Hover a pin…</div>
                 <div class="desc" data-pin-desc>Each gold contact carries one signal of the CPU bus out to the cartridge. Address lines in, data lines out, plus the strobes, clocks and expansion pins that let on-cart chips join the machine.</div>
               </div>
-              <span class="sim-note">A representative slice of the ~62-pin connector, colour-coded by signal group. The real pinout has more address/data pins; the idea is the same.</span>
+              <span class="sim-note">A simplified, representative slice of the 46-pin (+16) connector, colour-coded by signal group. The real connector carries A0–A15 plus a separate bank byte on BA0–BA7 — there are no literal A16–A23 pins — and more data, power and ground contacts; the idea is the same.</span>
             </div>
           </div>
 
@@ -609,9 +736,9 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li>The Game Pak edge connector is the 65816's own address/data bus, plus control, clock, audio and expansion pins.</li>
-              <li>24 address lines (A0–A23) reach 16 MB; 8 data lines (D0–D7) move one byte per access; /RD, /WR, /CART, φ2 govern timing and selection.</li>
+              <li>A0–A15 plus the bank-byte pins BA0–BA7 give 24 address bits (16 MB); 8 data lines (D0–D7) move one byte per access; /RD, /WR, /CART, φ2 govern timing and selection.</li>
               <li>Because chips on the cartridge see the CPU bus directly, they can be active participants, not just passive storage.</li>
-              <li>The expansion pins turn the slot into an expansion port — the reason enhancement chips were possible.</li>
+              <li>What made enhancement chips possible is the ordinary address/data bus itself being exposed at the slot — that, more than any special expansion pin, turned the connector into an expansion port.</li>
             </ul>
           </div>
 
@@ -659,22 +786,28 @@
             a save <strong>SRAM</strong> and its <strong>coin cell</strong>
             (Module 03). Some add an <strong>enhancement chip</strong> — the star
             of the coming modules. And nearly every licensed cartridge carries one
-            more, easy-to-miss part: a small four-legged chip called the
-            <span class="term" data-tip="Checking Integrated Circuit — Nintendo's lockout chip. It handshakes with a matching chip in the console; fail the handshake and the console is held in reset.">CIC</span>.
+            more, easy-to-miss part: a slim 16- or 18-pin chip (the F411/F413
+            family — a tiny 4-bit microcontroller) called the
+            <span class="term" data-tip="Checking Integrated Circuit — Nintendo's lockout chip, a small 4-bit microcontroller in a 16/18-pin DIP package. It runs in lockstep with a matching chip in the console; if their streams disagree, the console is held in reset.">CIC</span>.
           </p>
           <p>
-            The CIC (Checking Integrated Circuit) is the region and authentication
-            lock. A matching CIC sits in the console, and the two run a little
-            lockstep handshake — a stream generated on both sides that must agree.
-            If the cartridge CIC is missing, wrong, or from the wrong region, the
-            console's CIC yanks <code>/RESET</code> low and holds the machine in a
-            reset loop — the classic blinking, never-booting console. It is why an
-            American Super&nbsp;Nintendo won't run a Japanese
+            The CIC (Checking Integrated Circuit) is the authentication — and,
+            between TV standards, the region — lock. A matching CIC sits in the
+            console, and from power-on the two run in lockstep, each generating
+            the same seeded stream of bits continuously while the console side
+            keeps comparing. If the cartridge CIC is missing, wrong, or ever
+            disagrees, the console's CIC yanks <code>/RESET</code> low and holds
+            the machine in a reset loop — the classic blinking, never-booting
+            console. The CIC's keys differ between the NTSC and PAL worlds, so
+            it is what stops, say, a European cartridge booting on an American
+            console. The US–Japan divide is a different story: an American SNES
+            and a Japanese
             <span class="term" data-tip="The Japanese name and console for the Super Nintendo. Its cartridges have a rounded shell and different notches from the boxier US SNES pak.">Super Famicom</span>
-            cartridge without modification, and why the two regions used
-            different-shaped shells in the first place: the US SNES pak is boxy
-            with locking tabs, the Super&nbsp;Famicom pak rounded, with different
-            cartridge-slot notches so the wrong shape won't even fit.
+            use the <em>same</em> NTSC CIC, and a Japanese cartridge board passes
+            lockout in a US console perfectly. The only barrier between those two
+            regions is the plastic: the US SNES pak is boxy with locking tabs,
+            the Super&nbsp;Famicom pak rounded, with different cartridge-slot
+            notches so the wrong shape won't even fit the slot.
           </p>
 
           <figure class="figure">
@@ -698,7 +831,7 @@
               <text x="800" y="184" class="d-sub d-amber">gold fingers → bus</text>
               <text x="70" y="220" class="d-flow">Everything on this board sees the CPU bus through the gold connector at the bottom (Module 04).</text>
             </svg>
-            <figcaption class="fig-cap"><strong>A Game Pak, named.</strong> The one guaranteed part is the mask ROM; save SRAM + battery, an enhancement chip, and the <span class="term" data-tip="Nintendo's lockout chip that must handshake with the console or the machine stays in reset.">CIC</span> lockout are the optional company. All of it hangs off the edge connector's bus.</figcaption>
+            <figcaption class="fig-cap"><strong>A Game Pak, named.</strong> The one guaranteed part is the mask ROM; save SRAM + battery, an enhancement chip, and the <span class="term" data-tip="Nintendo's lockout chip; it must stay in lockstep with its twin in the console or the machine is held in reset.">CIC</span> lockout are the optional company. All of it hangs off the edge connector's bus.</figcaption>
           </figure>
 
           <div class="specs">
@@ -732,8 +865,8 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li>The one guaranteed part is the mask ROM (4–48 Mbit); SRAM+battery and an enhancement chip are optional additions.</li>
-              <li>The CIC lockout handshakes with a twin in the console; failure holds the machine in reset — this is the region lock.</li>
-              <li>SNES and Super Famicom paks use different shell shapes and slot notches, which (with the CIC region) enforce regional separation.</li>
+              <li>The CIC lockout runs a continuous seeded stream in lockstep with a twin in the console; any mismatch holds the machine in reset — authentication, and (between TV standards) the region lock.</li>
+              <li>US and Japanese machines share the same NTSC CIC — a Japanese cart passes lockout in a US console. That barrier is purely shell shape and slot notches; the CIC's differing keys separate NTSC from PAL.</li>
               <li>Everything on the board communicates through the edge connector's exposed CPU bus.</li>
             </ul>
           </div>
@@ -769,12 +902,37 @@
             layout from Module 02. Each successive 32&nbsp;KB slab of the ROM file
             appears in the next bank. <strong>HiROM</strong> instead uses the
             <em>whole</em> 64&nbsp;KB of a bank for ROM
-            (<code>$0000–$FFFF</code> in banks <code>$C0</code> upward), so each
-            bank holds twice as much and big contiguous data (like sampled audio
-            or long tables) doesn't get chopped every 32&nbsp;KB. Both maps also
+            (<code>$0000–$FFFF</code>), with the ROM appearing in banks
+            <code>$C0–$FF</code> <em>and</em> in banks <code>$40–$7D</code>, so
+            each bank holds twice as much and big contiguous data (like sampled
+            audio or long tables) doesn't get chopped every 32&nbsp;KB. Both maps
+            also
             <span class="term" data-tip="The same ROM appearing at more than one address range because the decode ignores some high address bits.">mirror</span>
             the ROM into other bank ranges, and both reserve a spot for save SRAM
             (Module 07).
+          </p>
+          <p>
+            Two things make the rest of this module painless. First, the worked
+            conversion, once, by hand: take file offset <code>$018000</code> in
+            a LoROM cart. Divide by <code>$8000</code> (32&nbsp;KB): the
+            quotient is 3, the remainder is 0 — so the byte lands in bank
+            <code>$03</code> at address <code>$8000&nbsp;+&nbsp;0</code>. File
+            offset <code>$018000</code> → CPU address <code>$03:8000</code>.
+            Every LoROM conversion is that one division. Second, the word
+            <strong>mirror</strong>, properly: a mirror is <em>not</em> a copy —
+            it is the <em>same physical bytes</em> answering at more than one
+            address, because the decoder ignores some high address bits. The
+            biggest mirror of all: banks <code>$80–$FF</code> repeat (almost)
+            the whole <code>$00–$7D</code> picture — that's the image FastROM
+            uses below, and it's why the lab's default CPU address
+            <code>$C0:8000</code> works under LoROM at all: bank <code>$C0</code>
+            is the fast mirror of bank <code>$40</code>. The one exception is
+            banks <code>$7E–$7F</code>, which the console's work RAM claims
+            outright — no cartridge ROM ever appears there (their would-be
+            mirrors <code>$FE–$FF</code> stay ROM). And why does HiROM start at
+            <code>$C0</code>? Because the low banks' upper halves are already
+            spoken for by the system layout, <code>$C0–$FF</code> is the first
+            clean stretch where a cartridge can own every byte of every bank.
           </p>
 
           <figure class="figure">
@@ -809,6 +967,87 @@
               <text x="30" y="220" class="d-flow">HiROM offset → addr:  bank = $C0 + (offset ÷ $10000),  addr = offset mod $10000</text>
             </svg>
             <figcaption class="fig-cap"><strong>Two projections of the same file.</strong> <span class="term" data-tip="32 KB of ROM in each bank's upper half.">LoROM</span> keeps the lower half of banks free for the system and stitches 32 KB slabs across banks; <span class="term" data-tip="Full 64 KB banks of ROM.">HiROM</span> spends whole banks on ROM for bigger contiguous runs. The arithmetic below converts a file offset to the CPU address it appears at.</figcaption>
+          </figure>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 520" role="img" aria-label="The full 24-bit address space drawn twice, side by side: under LoROM, 32 KB ROM slabs occupy the upper half of banks $00–$7D with SRAM at banks $70–$7D and a fast mirror at $80–$FF; under HiROM, full 64 KB ROM banks fill $40–$7D and $C0–$FF with SRAM windows at $6000–$7FFF in banks $20–$3F and $A0–$BF; in both maps banks $7E–$7F are the console's WRAM">
+              <!-- ====================== LoROM column ====================== -->
+              <text x="30" y="28" class="d-tag d-cyan">LoROM — 32 KB slabs stitched into upper halves</text>
+              <text x="30" y="52" class="d-sub" style="font-size:9px">each row = a run of banks · left edge $0000 → right edge $FFFF · split at $8000</text>
+              <!-- $00–$3F -->
+              <rect x="30" y="60" width="200" height="80" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+              <text x="130" y="96" text-anchor="middle" class="d-sub">system: WRAM mirror,</text>
+              <text x="130" y="110" text-anchor="middle" class="d-sub">registers (Module 02)</text>
+              <rect x="230" y="60" width="200" height="80" rx="4" fill="rgba(69,228,209,0.16)" class="d-cyan-s" stroke-width="1.3"/>
+              <text x="330" y="96" text-anchor="middle" class="d-sub d-cyan">ROM slabs 0–63</text>
+              <text x="330" y="110" text-anchor="middle" class="d-sub" style="font-size:9px">32 KB each at $8000+</text>
+              <text x="36" y="72" class="d-sub" style="font-size:9px">$00–$3F</text>
+              <!-- $40–$6F -->
+              <rect x="30" y="144" width="200" height="52" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+              <text x="130" y="174" text-anchor="middle" class="d-sub" style="font-size:9px">(open on most boards)</text>
+              <rect x="230" y="144" width="200" height="52" rx="4" fill="rgba(69,228,209,0.16)" class="d-cyan-s" stroke-width="1.3"/>
+              <text x="330" y="174" text-anchor="middle" class="d-sub d-cyan">more ROM slabs</text>
+              <text x="36" y="156" class="d-sub" style="font-size:9px">$40–$6F</text>
+              <!-- $70–$7D -->
+              <rect x="30" y="200" width="200" height="46" rx="4" fill="rgba(255,177,78,0.18)" class="d-amber-s" stroke-width="1.3"/>
+              <text x="130" y="227" text-anchor="middle" class="d-sub d-amber">save SRAM window</text>
+              <rect x="230" y="200" width="200" height="46" rx="4" fill="rgba(69,228,209,0.16)" class="d-cyan-s" stroke-width="1.3"/>
+              <text x="330" y="227" text-anchor="middle" class="d-sub d-cyan">ROM</text>
+              <text x="36" y="212" class="d-sub" style="font-size:9px">$70–$7D</text>
+              <!-- $7E–$7F WRAM hole -->
+              <rect x="30" y="250" width="400" height="30" rx="4" fill="rgba(168,132,255,0.22)" class="d-violet-s" stroke-width="1.4"/>
+              <text x="230" y="269" text-anchor="middle" class="d-sub d-violet">$7E–$7F — WRAM, 128 KB. The hole: never cartridge ROM.</text>
+              <!-- $80–$FD mirror -->
+              <rect x="30" y="284" width="400" height="86" rx="4" fill="rgba(69,228,209,0.07)" class="d-cyan-s" stroke-width="1.1" stroke-dasharray="4 3"/>
+              <text x="230" y="318" text-anchor="middle" class="d-sub d-cyan">$80–$FD — fast mirror of the picture above</text>
+              <text x="230" y="334" text-anchor="middle" class="d-sub" style="font-size:9px">same bytes, FastROM timing when the speed bit is set</text>
+              <!-- $FE–$FF -->
+              <rect x="30" y="374" width="400" height="26" rx="4" fill="rgba(69,228,209,0.14)" class="d-cyan-s" stroke-width="1.1"/>
+              <text x="230" y="391" text-anchor="middle" class="d-sub" style="font-size:9px">$FE–$FF — still ROM ($7E–$7F's would-be mirrors; WRAM doesn't repeat here)</text>
+
+              <!-- ====================== HiROM column ====================== -->
+              <text x="470" y="28" class="d-tag d-magenta">HiROM — whole 64 KB banks of ROM</text>
+              <text x="470" y="52" class="d-sub" style="font-size:9px">same address space, different cartridge wiring</text>
+              <!-- $00–$3F -->
+              <rect x="470" y="60" width="150" height="80" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+              <text x="545" y="96" text-anchor="middle" class="d-sub">system: WRAM</text>
+              <text x="545" y="110" text-anchor="middle" class="d-sub">mirror, registers</text>
+              <rect x="620" y="60" width="50" height="80" rx="4" fill="rgba(255,177,78,0.18)" class="d-amber-s" stroke-width="1.3"/>
+              <text x="645" y="93" text-anchor="middle" class="d-sub d-amber" style="font-size:8.5px">SRAM</text>
+              <text x="645" y="105" text-anchor="middle" class="d-sub" style="font-size:8px">$6000–$7FFF</text>
+              <text x="645" y="117" text-anchor="middle" class="d-sub" style="font-size:8px">banks $20–$3F</text>
+              <rect x="670" y="60" width="200" height="80" rx="4" fill="rgba(255,95,158,0.10)" class="d-magenta-s" stroke-width="1.1"/>
+              <text x="770" y="96" text-anchor="middle" class="d-sub d-magenta">ROM (upper halves</text>
+              <text x="770" y="110" text-anchor="middle" class="d-sub d-magenta">visible here too)</text>
+              <text x="476" y="72" class="d-sub" style="font-size:9px">$00–$3F</text>
+              <!-- $40–$7D -->
+              <rect x="470" y="144" width="400" height="70" rx="4" fill="rgba(255,95,158,0.16)" class="d-magenta-s" stroke-width="1.3"/>
+              <text x="670" y="176" text-anchor="middle" class="d-sub d-magenta">$40–$7D — ROM, full 64 KB banks</text>
+              <text x="670" y="192" text-anchor="middle" class="d-sub" style="font-size:9px">the same ROM as $C0+, at slow timing</text>
+              <!-- $7E–$7F -->
+              <rect x="470" y="218" width="400" height="30" rx="4" fill="rgba(168,132,255,0.22)" class="d-violet-s" stroke-width="1.4"/>
+              <text x="670" y="237" text-anchor="middle" class="d-sub d-violet">$7E–$7F — WRAM. Same hole, both maps.</text>
+              <!-- $80–$BF -->
+              <rect x="470" y="252" width="150" height="70" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+              <text x="545" y="284" text-anchor="middle" class="d-sub">system mirror</text>
+              <text x="545" y="298" text-anchor="middle" class="d-sub" style="font-size:9px">(fast)</text>
+              <rect x="620" y="252" width="50" height="70" rx="4" fill="rgba(255,177,78,0.18)" class="d-amber-s" stroke-width="1.3"/>
+              <text x="645" y="281" text-anchor="middle" class="d-sub d-amber" style="font-size:8.5px">SRAM</text>
+              <text x="645" y="293" text-anchor="middle" class="d-sub" style="font-size:8px">mirror</text>
+              <text x="645" y="305" text-anchor="middle" class="d-sub" style="font-size:8px">$A0–$BF</text>
+              <rect x="670" y="252" width="200" height="70" rx="4" fill="rgba(255,95,158,0.10)" class="d-magenta-s" stroke-width="1.1"/>
+              <text x="770" y="284" text-anchor="middle" class="d-sub d-magenta">ROM upper halves</text>
+              <text x="770" y="298" text-anchor="middle" class="d-sub" style="font-size:9px">(fast)</text>
+              <text x="476" y="264" class="d-sub" style="font-size:9px">$80–$BF</text>
+              <!-- $C0–$FF -->
+              <rect x="470" y="326" width="400" height="74" rx="4" fill="rgba(255,95,158,0.22)" class="d-magenta-s" stroke-width="1.5"/>
+              <text x="670" y="358" text-anchor="middle" class="d-sub d-magenta">$C0–$FF — ROM, full 64 KB banks (fast)</text>
+              <text x="670" y="374" text-anchor="middle" class="d-sub" style="font-size:9px">the canonical HiROM image: every byte of every bank is the cart's</text>
+
+              <text x="30" y="440" class="d-flow">both maps: banks $7E–$7F are WRAM's · both reserve an SRAM window · banks $80+ are the same picture at FastROM timing</text>
+              <text x="30" y="464" class="d-flow">LoROM: file marches 32 KB per bank through the upper halves · HiROM: file marches 64 KB per bank through $C0–$FF (and $40–$7D)</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The whole space, twice.</strong> The same 16 MB address space under each wiring. <span class="term" data-tip="32 KB of ROM in each bank's upper half, stitched bank after bank.">LoROM</span> threads the file through the upper halves of banks $00–$7D (save SRAM at banks $70–$7D); <span class="term" data-tip="Full 64 KB banks of ROM in $40–$7D and $C0–$FF, with SRAM at $6000–$7FFF in banks $20–$3F/$A0–$BF.">HiROM</span> fills whole banks at $40–$7D and $C0–$FF (save SRAM at $6000–$7FFF in banks $20–$3F, mirrored at $A0–$BF). In both, banks <code>$7E–$7F</code> are the console's WRAM and banks $80+ are the fast <span class="term" data-tip="The same physical bytes answering at more than one address because the decoder ignores some high address bits.">mirror</span>.</figcaption>
           </figure>
 
           <h4>FastROM: the same map, sped up</h4>
@@ -860,9 +1099,9 @@
           <div class="takeaway">
             <div class="th">Key takeaways</div>
             <ul>
-              <li>LoROM maps 32 KB of ROM into $8000–$FFFF of each bank; HiROM uses full 64 KB banks for bigger contiguous data.</li>
-              <li>Convert LoROM: bank = offset÷$8000, addr = $8000+(offset mod $8000). HiROM: bank = $C0+(offset÷$10000), addr = offset mod $10000.</li>
-              <li>The ROM is mirrored into several bank ranges; both maps reserve an SRAM window.</li>
+              <li>LoROM maps 32 KB of ROM into $8000–$FFFF of each bank; HiROM uses full 64 KB banks — in $40–$7D as well as $C0–$FF — for bigger contiguous data.</li>
+              <li>Convert LoROM: bank = offset÷$8000, addr = $8000+(offset mod $8000) — e.g. $018000 → $03:8000. HiROM: bank = $C0+(offset÷$10000), addr = offset mod $10000.</li>
+              <li>A mirror is the same physical bytes at multiple addresses; banks $80–$FF repeat the $00–$7D picture (except $7E–$7F, which are always WRAM). Both maps reserve an SRAM window.</li>
               <li>FastROM is not a different map — it's the same ROM read at 3.58 MHz through the $80–$FF bank image with a speed bit set.</li>
             </ul>
           </div>
@@ -884,16 +1123,18 @@
         <div class="prose">
           <p>
             Module 03 explained <em>why</em> saves live in battery-backed SRAM;
-            now the specifics. Save SRAM on the Super&nbsp;Nintendo ranged from a
-            tiny <strong>2&nbsp;Kbit</strong> (256 bytes — enough for a few high
-            scores) up to <strong>256&nbsp;Kbit</strong> (32&nbsp;KB) in the most
-            save-hungry RPGs. The size is declared in the ROM header (Module 13)
-            so the console — and later an emulator — knows how big a save file to
-            keep. Where that SRAM appears in the address space depends on the
-            map: in <strong>LoROM</strong> it typically sits in banks
-            <code>$70–$7D</code> at <code>$0000–$7FFF</code>; in
+            now the specifics. Save SRAM on the Super&nbsp;Nintendo ranged from
+            <strong>16&nbsp;Kbit</strong> (2&nbsp;KB — a few save slots) up to
+            <strong>256&nbsp;Kbit</strong> (32&nbsp;KB) in the most save-hungry
+            RPGs. The size is declared in the ROM header (Module 13) as a
+            power-of-two count of kilobytes — which is also why nothing smaller
+            than 2&nbsp;KB ever shipped: the header's code can't even express
+            less than a kilobyte. Where that SRAM appears in the address space
+            depends on the map: in <strong>LoROM</strong> it typically sits in
+            banks <code>$70–$7D</code> at <code>$0000–$7FFF</code>; in
             <strong>HiROM</strong> it lives in banks <code>$20–$3F</code> at
-            <code>$6000–$7FFF</code>. Either way it's the <code>/SRAM</code>
+            <code>$6000–$7FFF</code>, mirrored again in banks
+            <code>$A0–$BF</code>. Either way it's the <code>/SRAM</code>
             chip-select window you decoded in Module 02.
           </p>
           <p>
@@ -927,13 +1168,51 @@
             <table>
               <thead><tr><th>SRAM size</th><th>Bytes</th><th>Typical use</th></tr></thead>
               <tbody>
-                <tr><td><span class="crc">2 Kbit</span></td><td>256 B</td><td>high scores, tiny state</td></tr>
                 <tr><td><span class="crc">16 Kbit</span></td><td>2 KB</td><td>a few save slots</td></tr>
                 <tr><td><span class="crc">64 Kbit</span></td><td>8 KB</td><td>action-RPG saves</td></tr>
+                <tr><td><span class="crc">128 Kbit</span></td><td>16 KB</td><td>bigger RPGs, track/edit data</td></tr>
                 <tr><td><span class="crc">256 Kbit</span></td><td>32 KB</td><td>large multi-slot RPGs</td></tr>
               </tbody>
             </table>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 320" role="img" aria-label="Two strips of the 256 banks, one per memory map, highlighting where each map places its save-SRAM window: LoROM in banks $70–$7D at $0000–$7FFF, HiROM at $6000–$7FFF inside banks $20–$3F and mirrored in banks $A0–$BF">
+              <!-- LoROM strip -->
+              <text x="30" y="30" class="d-tag d-cyan">LoROM — where the save lives</text>
+              <g>
+                <rect x="30" y="46" width="367" height="40" rx="4" fill="rgba(69,228,209,0.08)" class="d-stroke-line" stroke-width="1"/>
+                <text x="214" y="70" text-anchor="middle" class="d-sub" style="font-size:9px">$00–$6F · ROM in the upper halves (M06)</text>
+                <rect x="397" y="46" width="46" height="40" rx="4" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.6"/>
+                <rect x="443" y="46" width="7" height="40" fill="rgba(168,132,255,0.4)"/>
+                <rect x="450" y="46" width="420" height="40" rx="4" fill="rgba(69,228,209,0.05)" class="d-stroke-line" stroke-width="1" stroke-dasharray="4 3"/>
+                <text x="660" y="70" text-anchor="middle" class="d-sub" style="font-size:9px">$80–$FF · fast mirror</text>
+              </g>
+              <text x="420" y="112" text-anchor="middle" class="d-sub d-amber">↑ SRAM: banks $70–$7D, addresses $0000–$7FFF</text>
+              <text x="447" y="132" text-anchor="middle" class="d-sub d-violet" style="font-size:9px">(the thin violet sliver: $7E–$7F WRAM)</text>
+
+              <!-- HiROM strip -->
+              <text x="30" y="176" class="d-tag d-magenta">HiROM — where the save lives</text>
+              <g>
+                <rect x="30" y="192" width="105" height="40" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <text x="82" y="216" text-anchor="middle" class="d-sub" style="font-size:9px">$00–$1F</text>
+                <rect x="135" y="192" width="105" height="40" rx="4" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.6"/>
+                <text x="187" y="216" text-anchor="middle" class="d-sub" style="font-size:9px;fill:#ece8f6">$20–$3F</text>
+                <rect x="240" y="192" width="203" height="40" rx="4" fill="rgba(255,95,158,0.16)" class="d-magenta-s" stroke-width="1.2"/>
+                <text x="341" y="216" text-anchor="middle" class="d-sub d-magenta" style="font-size:9px">$40–$7D ROM</text>
+                <rect x="443" y="192" width="7" height="40" fill="rgba(168,132,255,0.4)"/>
+                <rect x="450" y="192" width="105" height="40" rx="4" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <text x="502" y="216" text-anchor="middle" class="d-sub" style="font-size:9px">$80–$9F</text>
+                <rect x="555" y="192" width="105" height="40" rx="4" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.6"/>
+                <text x="607" y="216" text-anchor="middle" class="d-sub" style="font-size:9px;fill:#ece8f6">$A0–$BF</text>
+                <rect x="660" y="192" width="210" height="40" rx="4" fill="rgba(255,95,158,0.22)" class="d-magenta-s" stroke-width="1.3"/>
+                <text x="765" y="216" text-anchor="middle" class="d-sub d-magenta" style="font-size:9px">$C0–$FF ROM (fast)</text>
+              </g>
+              <text x="30" y="262" class="d-sub d-amber">↑ SRAM: the $6000–$7FFF slice inside each amber bank — banks $20–$3F, mirrored again at $A0–$BF</text>
+              <text x="30" y="296" class="d-flow">same battery-backed chip either way — only the wiring decides which addresses reach it. This resolves Module 02's "expansion / SRAM" window.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>One save chip, two homes.</strong> <span class="term" data-tip="32 KB ROM slabs in upper halves; SRAM gets whole lower halves of banks $70–$7D.">LoROM</span> parks save SRAM in the lower halves of banks $70–$7D; <span class="term" data-tip="Full ROM banks; SRAM appears at $6000–$7FFF of banks $20–$3F and $A0–$BF.">HiROM</span> squeezes it into the $6000–$7FFF window of banks $20–$3F (and its $A0–$BF <span class="term" data-tip="The same physical bytes answering at more than one address.">mirror</span>) — the very window Module 02's decoder figure marked "expansion / SRAM".</figcaption>
+          </figure>
 
           <p>
             The lab lets you pick an SRAM size and a memory map and see exactly
@@ -947,7 +1226,7 @@
               <div class="controls">
                 <div class="ctrl">
                   <label>SRAM size — <span class="val" id="save-size-val"></span></label>
-                  <input type="range" min="0" max="4" value="3" step="1" list="save-sizes" data-save-size aria-label="SRAM size">
+                  <input type="range" min="0" max="3" value="2" step="1" list="save-sizes" data-save-size aria-label="SRAM size">
                 </div>
                 <div class="ctrl">
                   <label>Memory map</label>
@@ -976,8 +1255,8 @@
           <div class="takeaway">
             <div class="th">Key takeaways</div>
             <ul>
-              <li>Save SRAM ranged from 2 Kbit (256 B) to 256 Kbit (32 KB); the size is declared in the ROM header.</li>
-              <li>LoROM puts SRAM around banks $70–$7D; HiROM around banks $20–$3F at $6000–$7FFF — the /SRAM window.</li>
+              <li>Save SRAM ranged from 16 Kbit (2 KB) to 256 Kbit (32 KB); the size is declared in the ROM header as a power-of-two count of KB.</li>
+              <li>LoROM puts SRAM around banks $70–$7D; HiROM around banks $20–$3F (mirrored at $A0–$BF) at $6000–$7FFF — the /SRAM window.</li>
               <li>A few cartridges added a battery-backed real-time clock: Nintendo's S-RTC, and the SPC7110's built-in clock.</li>
               <li>The same coin cell that preserves a save can keep an RTC ticking while the console is off.</li>
             </ul>
@@ -1123,16 +1402,67 @@
             Its trick is a <span class="term" data-tip="A Super FX instruction that writes a single pixel into the framebuffer in cart RAM, handling the bitplane arithmetic in hardware.">plot</span>
             instruction: dedicated hardware that writes one pixel into a
             framebuffer held in the cartridge's own RAM, doing the fiddly
-            bitplane math the SNES's tile-based picture unit makes painful. The
+            <span class="term" data-tip="The SNES's native graphics format slices each tile's pixels into stacked bit-layers ('planes'); writing one pixel means touching several bytes.">bitplane</span>
+            math the SNES's tile-based picture unit makes painful (in that
+            native format each tile's pixels are sliced into bit-layers —
+            the format Part&nbsp;II of the graphics course walks through). The
             GSU runs a program that transforms and rasterises 3D geometry, plotting
             it pixel-by-pixel into that cart-RAM framebuffer. When a frame is
-            finished, the main CPU copies (or points the picture unit at) the
-            rendered image and shows it. That division of labour — GSU draws into
-            cart RAM, CPU reads the result — is how <em>Star&nbsp;Fox</em>'s
+            finished, the main CPU copies the rendered image into the console's
+            video memory — usually with a DMA burst — and shows it; the picture
+            unit cannot read cart RAM itself, so the finished frame always makes
+            that hop. That division of labour — GSU draws into
+            cart RAM, CPU ferries the result to the screen — is how <em>Star&nbsp;Fox</em>'s
             polygon fighters, <em>Stunt&nbsp;Race&nbsp;FX</em>'s cars and
             <em>Yoshi's Island</em>'s stretchy effects existed on a machine with
             no 3D hardware of its own.
           </p>
+          <p>
+            One constraint defines Super&nbsp;FX programming, and it answers the
+            question you should be itching to ask: two processors, one ROM —
+            who gets the bus? The answer is <em>not both at once</em>. Control
+            bits (called <code>RON</code> and <code>RAN</code>) hand ownership
+            of the cartridge ROM and RAM to the GSU while it renders, and during
+            that time the main CPU is locked out of the cartridge entirely — an
+            access there won't reach the real chips. So Super&nbsp;FX games copy
+            their 65816 code into the console's work RAM and run from
+            <em>there</em> while the GSU owns the cart, waiting for the chip to
+            signal it's finished and hand the bus back. Two drivers, one
+            steering wheel, taking strict turns — and it's why the main CPU's
+            role in these games is mostly to direct traffic.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 290" role="img" aria-label="Bus arbitration on a Super FX cartridge: while the RON and RAN bits give the GSU ownership of the cart ROM and RAM, the S-CPU is locked out and runs from work RAM; when rendering ends the bus is handed back and the CPU copies the framebuffer to VRAM">
+              <defs><marker id="ah09b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <!-- S-CPU -->
+              <rect x="30" y="50" width="180" height="80" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="120" y="82" text-anchor="middle" class="d-label" style="font-size:13px">S-CPU</text>
+              <text x="120" y="102" text-anchor="middle" class="d-sub">runs from WRAM meanwhile</text>
+              <!-- GSU -->
+              <rect x="690" y="50" width="180" height="80" rx="10" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="780" y="82" text-anchor="middle" class="d-label d-magenta" style="font-size:13px">GSU</text>
+              <text x="780" y="102" text-anchor="middle" class="d-sub">rendering the frame</text>
+              <!-- shared cart memory -->
+              <rect x="330" y="42" width="240" height="96" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="450" y="72" text-anchor="middle" class="d-label d-amber" style="font-size:12px">cart ROM + RAM</text>
+              <text x="450" y="92" text-anchor="middle" class="d-sub">one memory, one owner at a time</text>
+              <text x="450" y="110" text-anchor="middle" class="d-sub" style="font-size:9px">RON/RAN = "the GSU owns it"</text>
+              <!-- arrows -->
+              <line x1="686" y1="90" x2="576" y2="90" class="d-axis" stroke-width="2" marker-end="url(#ah09b)" stroke="#ff5f9e"/>
+              <text x="631" y="78" text-anchor="middle" class="d-flow d-magenta">owns the bus</text>
+              <line x1="214" y1="90" x2="324" y2="90" class="d-axis" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ah09b)"/>
+              <text x="269" y="78" text-anchor="middle" class="d-flow" style="fill:#ff6a6a">✕ locked out</text>
+              <!-- timeline -->
+              <text x="30" y="184" class="d-tag">one frame, as a timeline</text>
+              <rect x="30" y="196" width="520" height="34" rx="6" fill="rgba(255,95,158,0.18)" class="d-magenta-s" stroke-width="1.3"/>
+              <text x="290" y="217" text-anchor="middle" class="d-sub d-magenta">GSU renders — owns cart ROM/RAM · S-CPU parked in WRAM</text>
+              <rect x="554" y="196" width="316" height="34" rx="6" fill="rgba(168,132,255,0.18)" class="d-violet-s" stroke-width="1.3"/>
+              <text x="712" y="217" text-anchor="middle" class="d-sub d-violet">handback — CPU DMA-copies framebuffer → VRAM</text>
+              <text x="30" y="266" class="d-flow">two processors never touch the cart memory at the same instant — ownership flips, work continues, frame ships.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two hands, one memory.</strong> The <span class="term" data-tip="Register bits on the Super FX that assign the cartridge ROM (RON) and RAM (RAN) to the GSU.">RON/RAN</span> bits give the <span class="term" data-tip="The Super FX RISC core.">GSU</span> sole ownership of the cart ROM and RAM while it renders; the S-CPU, locked out, executes from the console's work RAM. When the GSU finishes, the bus flips back and the CPU DMA-copies the framebuffer into video memory. This handover, every frame, is the defining Super FX constraint.</figcaption>
+          </figure>
 
           <div class="analogy">
             <span class="lbl">Analogy · A sketch artist working in the trunk</span>
@@ -1207,7 +1537,8 @@
             <ul>
               <li>The Super FX's core is the GSU, a real RISC processor (~10.7 MHz; Rev 2 roughly double) living on the cartridge.</li>
               <li>Its plot hardware writes pixels into a framebuffer in cart RAM, doing the SNES's painful bitplane math in hardware.</li>
-              <li>The GSU renders whole 3D/polygon scenes; the main CPU just reads back and displays the finished frame.</li>
+              <li>The GSU renders whole 3D/polygon scenes; the main CPU DMA-copies the finished framebuffer to video RAM — the picture unit can't read cart RAM.</li>
+              <li>While the GSU renders it owns the cart ROM/RAM (the RON/RAN bits); the locked-out main CPU runs from work RAM until handback — the defining Super FX constraint.</li>
               <li>Star Fox, Stunt Race FX and Yoshi's Island are the Super FX in action.</li>
             </ul>
           </div>
@@ -1270,6 +1601,47 @@
             <div class="spec"><div class="k">Best at</div><div class="v">logic</div><div class="d">AI, decompression</div></div>
           </div>
 
+          <figure class="figure">
+            <svg viewBox="0 0 900 340" role="img" aria-label="SA-1 block diagram: the console's S-CPU and the SA-1's own 65816 core both reach the cartridge ROM through the SA-1's memory controller; the package also contains 2 KB of IRAM used as a mailbox, fast multiply/divide hardware and DMA, plus battery-backed BW-RAM">
+              <defs><marker id="ah10" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <!-- console CPU -->
+              <rect x="30" y="120" width="150" height="70" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="105" y="150" text-anchor="middle" class="d-label" style="font-size:13px">S-CPU</text>
+              <text x="105" y="168" text-anchor="middle" class="d-sub">console · 3.58 MHz</text>
+              <!-- SA-1 package -->
+              <rect x="230" y="34" width="420" height="272" rx="14" fill="rgba(255,95,158,0.05)" class="d-magenta-s" stroke-width="1.6"/>
+              <text x="250" y="58" class="d-tag d-magenta">the SA-1 package</text>
+              <rect x="250" y="72" width="180" height="66" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+              <text x="340" y="99" text-anchor="middle" class="d-label d-magenta" style="font-size:12px">65816 core</text>
+              <text x="340" y="117" text-anchor="middle" class="d-sub">~10.7 MHz</text>
+              <rect x="450" y="72" width="180" height="66" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="540" y="99" text-anchor="middle" class="d-label" style="font-size:12px">IRAM · 2 KB</text>
+              <text x="540" y="117" text-anchor="middle" class="d-sub">mailbox both CPUs share</text>
+              <rect x="250" y="152" width="180" height="56" rx="8" class="d-fill-panel d-amber-s" stroke-width="1.4"/>
+              <text x="340" y="176" text-anchor="middle" class="d-label d-amber" style="font-size:12px">× ÷ unit</text>
+              <text x="340" y="194" text-anchor="middle" class="d-sub">fast multiply / divide</text>
+              <rect x="450" y="152" width="180" height="56" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="540" y="176" text-anchor="middle" class="d-label d-violet" style="font-size:12px">DMA</text>
+              <text x="540" y="194" text-anchor="middle" class="d-sub">block moves, char conv.</text>
+              <rect x="250" y="224" width="380" height="58" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+              <text x="440" y="248" text-anchor="middle" class="d-label" style="font-size:12px">memory controller</text>
+              <text x="440" y="266" text-anchor="middle" class="d-sub">bank-switching "super MMC" — arbitrates both CPUs</text>
+              <!-- ROM & BW-RAM -->
+              <rect x="700" y="80" width="170" height="80" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="785" y="112" text-anchor="middle" class="d-label" style="font-size:13px">Mask ROM</text>
+              <text x="785" y="130" text-anchor="middle" class="d-sub">the game · shared</text>
+              <rect x="700" y="190" width="170" height="80" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="785" y="222" text-anchor="middle" class="d-label d-amber" style="font-size:13px">BW-RAM</text>
+              <text x="785" y="240" text-anchor="middle" class="d-sub">battery-backed work/save</text>
+              <!-- wires -->
+              <line x1="184" y1="155" x2="246" y2="155" class="d-axis" stroke-width="1.8" marker-end="url(#ah10)"/>
+              <line x1="654" y1="253" x2="696" y2="160" class="d-axis" stroke-width="1.8" marker-end="url(#ah10)"/>
+              <line x1="654" y1="253" x2="696" y2="230" class="d-axis" stroke-width="1.8" marker-end="url(#ah10)"/>
+              <text x="30" y="330" class="d-flow">both processors reach the one ROM through the memory controller, and pass messages through the little 2 KB IRAM mailbox.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Inside the SA-1.</strong> A second <span class="term" data-tip="The same CPU architecture as the console's own processor.">65816</span> at ~10.7 MHz, 2 KB of on-chip <span class="term" data-tip="Internal RAM inside the SA-1 package; both CPUs can access it, so it doubles as a message-passing mailbox.">IRAM</span>, hardware multiply/divide and DMA — with a memory controller that lets both the console's CPU and the SA-1 share the single cartridge ROM, and battery-backed <span class="term" data-tip="The SA-1 cart's RAM chip, usable as work RAM and battery-backed save RAM at once.">BW-RAM</span> alongside. The two CPUs coordinate by leaving messages in IRAM.</figcaption>
+          </figure>
+
           <p>
             The lab races the same workload on both processors: the main CPU at
             its ~3.58&nbsp;MHz against the SA-1 at ~10.7&nbsp;MHz. Press
@@ -1330,6 +1702,15 @@
             a chip built to do exactly that repetitive fixed-point math at speed.
           </p>
           <p>
+            "Fixed-point" is worth thirty seconds. The chip stores only whole
+            numbers, and everyone simply <em>agrees</em> that a stored value
+            really means "this ÷ 256." So 1.5 is stored as <strong>384</strong>
+            (because 384&nbsp;÷&nbsp;256&nbsp;=&nbsp;1.5), and doubling it gives
+            768 — which reads back as 3.0. All the speed of integer hardware,
+            most of the usefulness of fractions; the decimal point never moves
+            because it's imaginary, "fixed" at an agreed position.
+          </p>
+          <p>
             The workhorse was the NEC
             <span class="term" data-tip="The NEC DSP core used on SNES cartridges; the DSP-1 configuration ran the matrix/vector/trig math for Mode 7 and 3D.">µPD77C25</span>
             family, whose most common configuration on SNES cartridges was the
@@ -1358,6 +1739,36 @@
               calculator just makes the numbers instant.
             </p>
           </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 240" role="img" aria-label="A CPU-to-DSP transaction: the 65816 writes operands into the DSP's data register, the µPD77C25 crunches them through its fixed-point multiply array, and the CPU reads the results back from the same register">
+              <defs><marker id="ah11" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <!-- CPU -->
+              <rect x="30" y="60" width="180" height="90" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="120" y="95" text-anchor="middle" class="d-label" style="font-size:13px">65816</text>
+              <text x="120" y="115" text-anchor="middle" class="d-sub">has the coordinates</text>
+              <!-- data register -->
+              <rect x="290" y="66" width="150" height="78" rx="8" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="365" y="96" text-anchor="middle" class="d-label d-amber" style="font-size:12px">data register</text>
+              <text x="365" y="114" text-anchor="middle" class="d-sub">a window on the bus</text>
+              <!-- DSP -->
+              <rect x="520" y="48" width="220" height="114" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="630" y="80" text-anchor="middle" class="d-label" style="font-size:13px">µPD77C25</text>
+              <text x="630" y="100" text-anchor="middle" class="d-sub">fixed-point multiply array</text>
+              <text x="630" y="118" text-anchor="middle" class="d-sub" style="font-size:9px">matrix × vector · trig · projection</text>
+              <text x="630" y="136" text-anchor="middle" class="d-sub" style="font-size:9px">running its own microcode</text>
+              <!-- arrows -->
+              <line x1="214" y1="85" x2="286" y2="85" class="d-axis" stroke-width="1.8" marker-end="url(#ah11)"/>
+              <text x="250" y="74" text-anchor="middle" class="d-flow d-violet">① write operands</text>
+              <line x1="444" y1="90" x2="516" y2="90" class="d-axis" stroke-width="1.8" marker-end="url(#ah11)"/>
+              <text x="480" y="79" text-anchor="middle" class="d-flow">② crunch</text>
+              <line x1="516" y1="128" x2="444" y2="128" class="d-axis" stroke-width="1.8" marker-end="url(#ah11)"/>
+              <line x1="286" y1="128" x2="214" y2="128" class="d-axis" stroke-width="1.8" marker-end="url(#ah11)"/>
+              <text x="365" y="162" text-anchor="middle" class="d-flow d-cyan">③ read results back</text>
+              <text x="30" y="204" class="d-flow">write x, y, z and the angles → the DSP multiplies them through the matrix → read back the screen position. Thousands of times a frame.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>One transaction, endlessly repeated.</strong> The CPU writes operands into the DSP's <span class="term" data-tip="The single register window through which the CPU and DSP exchange 16-bit values on the cartridge bus.">data register</span>, the <span class="term" data-tip="NEC's DSP core: a fast fixed-point multiplier fed by its own internal microcode ROM.">µPD77C25</span> runs them through its fixed-point multiply array, and the CPU reads the answers back. In <em>Super&nbsp;Mario&nbsp;Kart</em> this loop is what turns track coordinates into Mode&nbsp;7 perspective every frame.</figcaption>
+          </figure>
 
           <p>
             The lab is a DSP-1 in spirit: it takes a set of 3D points and projects
@@ -1430,8 +1841,10 @@
             did a similar decompression job and, as noted in Module 07, bundled a
             real-time clock. Rounding out the zoo: Capcom's
             <span class="term" data-tip="Capcom's math chip for trig and wireframe effects in the Mega Man X sequels.">CX4</span>
-            (trig/wireframe, from Module 11), the <span class="term" data-tip="A small helper chip that managed sprite/OAM data for a couple of games.">OBC1</span>
-            sprite helper, and a long tail of one-off and licensed parts. The
+            (trig/wireframe, from Module 11), the <span class="term" data-tip="A small helper chip that managed sprite/OAM data. It shipped in exactly one game: Metal Combat: Falcon's Revenge.">OBC1</span>
+            sprite helper (which shipped in exactly one game,
+            <em>Metal&nbsp;Combat:&nbsp;Falcon's&nbsp;Revenge</em>), and a long
+            tail of one-off and licensed parts. The
             common thread is the same as ever: because the chip sits on the CPU
             bus, the console fetches "graphics" and the cartridge quietly
             manufactures them.
@@ -1461,11 +1874,18 @@
           </figure>
 
           <p>
-            The lab is a decompressor in that spirit. A short stream of
-            compression tokens — literals and back-references, the bones of any
-            LZ/RLE scheme — is unpacked "on the cart" into a small graphic,
-            byte-by-byte, so you can watch a tiny compressed input bloom into a
-            full tile and see the compression ratio it bought.
+            The warm-up idea behind all compression fits in one line:
+            <code>AAAABBB</code> squeezes down to "4×A, 3×B" — <em>say what
+            repeats instead of repeating it</em>. The lab below is that idea
+            grown up: a short stream of compression tokens — literals and
+            back-references, the bones of any LZ/RLE scheme — is unpacked "on
+            the cart" into a small graphic, byte-by-byte, so you can watch a
+            tiny compressed input bloom into a full tile and see the ratio it
+            bought. One honest footnote: the real S-DD1's scheme is not LZ at
+            all — it is a bitplane-aware <em>entropy coder</em> (Golomb-style
+            codes, driven by per-bitplane probability estimates). The lab shows
+            the simpler LZ idea, in the same store-less-expand-on-demand
+            spirit.
           </p>
 
           <div class="lab" id="lab-decomp">
@@ -1478,7 +1898,7 @@
                   <span class="readout good">Ratio <b data-dec-ratio>—</b></span>
                   <span class="readout">Output <b data-dec-out>—</b></span>
                 </div>
-                <span class="sim-note">"LIT" writes a run of pixels; "COPY" repeats an earlier run (a back-reference) — the two moves at the heart of LZ-style compression the S-DD1 did in hardware.</span>
+                <span class="sim-note">"LIT" writes a run of pixels; "COPY" repeats an earlier run (a back-reference) — the two moves of LZ-style compression, shown here for clarity. The real S-DD1 used a bitplane-aware entropy coder (Golomb-style ABS codes), not LZ; the lab keeps the simpler idea, in the same spirit.</span>
               </div>
             </div>
           </div>
@@ -1487,8 +1907,8 @@
             <div class="th">Key takeaways</div>
             <ul>
               <li>Some cartridges decompressed graphics in real time so the ROM only stored the compressed version.</li>
-              <li>The S-DD1 (Star Ocean, SF Alpha 2) is the flagship real-time decompressor; the SPC7110 combined compression with an RTC.</li>
-              <li>Capcom's CX4 (trig/wireframe) and the OBC1 sprite helper round out the family, alongside many one-off parts.</li>
+              <li>The S-DD1 (Star Ocean, SF Alpha 2) is the flagship real-time decompressor — in silicon it's a bitplane-aware entropy coder; the SPC7110 combined compression with an RTC.</li>
+              <li>Capcom's CX4 (trig/wireframe) and the OBC1 sprite helper (one game: Metal Combat: Falcon's Revenge) round out the family, alongside many one-off parts.</li>
               <li>As always, it works because the chip sits on the CPU bus: the console reads "graphics," the cartridge makes them.</li>
             </ul>
           </div>
@@ -1533,14 +1953,67 @@
             But a bare pile of bytes doesn't say whether it's LoROM or HiROM,
             whether there's a Super&nbsp;FX or an SA-1 aboard, or how big the save
             is. Almost all of that is answered by a small
-            <span class="term" data-tip="A fixed region near the top of bank $00 holding the game's name, map mode, chipset byte, ROM/RAM sizes, region and checksum.">internal header</span>
-            the SNES itself reads at boot, sitting near the top of the first bank:
-            around <code>$FFC0</code> in a LoROM image (and near
-            <code>$FFB0</code>/<code>$FFD0</code> for HiROM, because the header
-            lands at a different file offset when whole banks are used).
+            <span class="term" data-tip="A fixed region at CPU addresses $00:FFB0–$FFDF holding the game's name, map mode, chipset byte, ROM/RAM sizes, region and checksum.">internal header</span> —
+            and reading it needs this module's one big idea: there are
+            <strong>two rulers</strong> for measuring the same bytes. One ruler
+            is <em>file offsets</em>: 0, 1, 2… from the start of the dump. The
+            other is <em>CPU addresses</em>: where those bytes land once the
+            Module 06 mapping is applied. On the CPU ruler the header always
+            sits in the same place — <code>$00:FFB0–$FFDF</code>, just below
+            the 65816's interrupt and reset vectors at
+            <code>$FFE0–$FFFF</code> — under <em>both</em> maps. On the file
+            ruler it lands at <em>different</em> offsets:
+            <code>$7FB0–$7FDF</code> in a LoROM file (that CPU range is the top
+            of the first 32&nbsp;KB slab) and <code>$FFB0–$FFDF</code> in a
+            HiROM file (the top of the first full 64&nbsp;KB bank) — plus 512
+            more if a copier header is stuck on the front. And one honesty
+            note: the console itself never "reads the header" — at power-on it
+            fetches just the reset vector at <code>$FFFC</code> and starts
+            executing. The header is a convention parsed by humans, tools and
+            emulators.
           </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 330" role="img" aria-label="Two rulers measuring the same bytes: on the CPU-address ruler the internal header always sits at $00:FFB0–$FFDF; on the file-offset ruler it lands at $7FB0 in a LoROM file and $FFB0 in a HiROM file, and a 512-byte SMC copier header shifts every file offset by $200">
+              <defs><marker id="ah13" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <!-- CPU ruler -->
+              <text x="30" y="28" class="d-tag d-violet">ruler 1 — CPU addresses (bank $00)</text>
+              <rect x="30" y="40" width="840" height="34" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.3"/>
+              <text x="40" y="61" class="d-sub">$0000</text>
+              <rect x="760" y="40" width="62" height="34" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.5"/>
+              <text x="791" y="61" text-anchor="middle" class="d-sub" style="font-size:8.5px;fill:#ece8f6">header</text>
+              <rect x="822" y="40" width="48" height="34" rx="6" fill="rgba(255,95,158,0.35)" class="d-magenta-s" stroke-width="1.4"/>
+              <text x="846" y="61" text-anchor="middle" class="d-sub" style="font-size:8px">vectors</text>
+              <text x="760" y="92" class="d-sub d-amber" style="font-size:9px">$FFB0–$FFDF — same place under both maps</text>
+              <text x="822" y="106" class="d-sub d-magenta" style="font-size:9px">$FFE0–$FFFF · reset at $FFFC</text>
+              <!-- connection bands: same bytes, two rulers -->
+              <path d="M 780 74 L 438 158" fill="none" stroke="#ffb14e" stroke-width="1.6" stroke-dasharray="5 4"/>
+              <path d="M 812 74 L 838 250" fill="none" stroke="#ffb14e" stroke-width="1.6" stroke-dasharray="5 4"/>
+              <!-- LoROM file ruler -->
+              <text x="30" y="150" class="d-tag d-cyan">ruler 2a — file offsets, LoROM dump</text>
+              <rect x="30" y="162" width="840" height="34" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.3"/>
+              <text x="40" y="183" class="d-sub">0</text>
+              <line x1="450" y1="162" x2="450" y2="196" class="d-axis" stroke-width="1.2"/>
+              <text x="456" y="210" class="d-sub" style="font-size:9px">$8000 — end of slab 0 (= CPU $00:FFFF)</text>
+              <rect x="427" y="162" width="23" height="34" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.5"/>
+              <text x="330" y="183" text-anchor="end" class="d-sub d-amber" style="font-size:9px">header at $7FB0 →</text>
+              <!-- HiROM file ruler -->
+              <text x="30" y="242" class="d-tag d-magenta">ruler 2b — file offsets, HiROM dump</text>
+              <rect x="30" y="254" width="840" height="34" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.3"/>
+              <text x="40" y="275" class="d-sub">0</text>
+              <rect x="826" y="254" width="24" height="34" fill="rgba(255,177,78,0.45)" class="d-amber-s" stroke-width="1.5"/>
+              <text x="820" y="275" text-anchor="end" class="d-sub d-amber" style="font-size:9px">header at $FFB0 (end of bank 0) →</text>
+              <text x="852" y="275" class="d-sub" style="font-size:8px">$10000</text>
+              <!-- SMC note -->
+              <rect x="30" y="304" width="56" height="18" rx="4" fill="rgba(135,127,158,0.2)" class="d-stroke-line" stroke-width="1"/>
+              <text x="58" y="317" text-anchor="middle" class="d-sub" style="font-size:8px">+512 SMC</text>
+              <text x="96" y="317" class="d-sub" style="font-size:9.5px">if an SMC copier header is glued on the front, every file offset above slides up by $200 — detect it and subtract.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two rulers, one set of bytes.</strong> On the CPU ruler the <span class="term" data-tip="The fixed region at CPU $00:FFB0–$FFDF describing the cartridge.">internal header</span> always occupies <code>$00:FFB0–$FFDF</code>, just below the interrupt <span class="term" data-tip="The table of addresses at $FFE0–$FFFF the CPU jumps through for reset and interrupts; the reset vector is at $FFFC.">vectors</span>. On the file ruler it lands wherever the map's arithmetic puts it: <code>$7FB0</code> in a LoROM dump, <code>$FFB0</code> in a HiROM dump, +512 if an <span class="term" data-tip="The 512-byte copier header some dumps carry; shifts every offset by $200.">SMC header</span> is present. That's why an emulator probes both places and lets the checksum arbitrate.</figcaption>
+          </figure>
           <p>
-            Walk the key bytes. At <code>$FFC0</code> is the 21-character
+            Walk the key bytes — quoted as CPU addresses from here on (subtract
+            <code>$8000</code> for the LoROM file offset). At <code>$FFC0</code> is the 21-character
             <strong>title</strong>. At <code>$FFD5</code> the
             <span class="term" data-tip="The header byte that encodes LoROM/HiROM/ExHiROM and whether FastROM timing is used.">map mode</span>
             byte (e.g. <code>$20</code> LoROM, <code>$21</code> HiROM,
@@ -1635,7 +2108,7 @@
           <div class="takeaway">
             <div class="th">Course complete ✦</div>
             <ul>
-              <li>A ROM image is the mask ROM's bytes; its internal header (~$FFC0) declares title, map mode, chipset, ROM/RAM sizes, region and checksum.</li>
+              <li>A ROM image is the mask ROM's bytes; its internal header (CPU $00:FFB0–$FFDF — file offset $7FB0 LoROM / $FFB0 HiROM) declares title, map mode, chipset, ROM/RAM sizes, region and checksum. The console itself only fetches the reset vector ($FFFC); tools and emulators parse the header.</li>
               <li>The map byte picks LoROM/HiROM/FastROM; the chipset byte's nibbles reveal RAM, battery and which coprocessor — DSP, GSU, SA-1, S-DD1…</li>
               <li>A 512-byte SMC/copier header shifts every offset by $200; detect it from a file-size remainder and skip it. bsnes leans on a database plus heuristics.</li>
               <li>And it all closes the loop on Module 01: an emulator's whole job is to answer "address in, data out" for this ROM — and now to be a Super FX, an SA-1 or a DSP-1 exactly when the header says so.</li>
@@ -1661,9 +2134,10 @@
           the text says so and hedges.
         </p>
         <p class="src">
-          Reference points · internal header near <code>$FFC0</code> (LoROM) /
-          <code>$FFB0</code>+<code>$FFD0</code> (HiROM) · enhancement chips:
-          GSU, SA-1, µPD77C25, S-DD1, SPC7110, CX4
+          Reference points · internal header at CPU <code>$00:FFB0–$FFDF</code>
+          under both maps (file offset <code>$7FB0</code> LoROM ·
+          <code>$FFB0</code> HiROM · +512 with an SMC copier header) ·
+          enhancement chips: GSU, SA-1, µPD77C25, S-DD1, SPC7110, CX4
         </p>
       </footer>
 

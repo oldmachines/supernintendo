@@ -280,14 +280,21 @@ function brrSource(srcRate, freq, dur) {
   }
   return s;
 }
-function playSamples(int16, srcRate, dur, loop) {
+function playSamples(int16, srcRate, dur, loop, loopPts) {
   return (ctx, dest) => {
     const b = ctx.createBuffer(1, int16.length, srcRate), d = b.getChannelData(0);
     for (let i = 0; i < int16.length; i++) d[i] = int16[i] / 32768;
     const t0 = ctx.currentTime + 0.02;
     const g = ctx.createGain(); g.gain.value = 0.85; g.connect(dest);
     const node = ctx.createBufferSource(); node.buffer = b; node.connect(g);
-    if (loop) { node.loop = true; node.start(t0); return { duration: 999, stop() { try { node.stop(); } catch (e) {} } }; }
+    if (loop) {
+      node.loop = true;
+      /* hardware-style looping: the attack portion plays once, then only the
+         region from the loop pointer to the END block repeats — Web Audio's
+         loopStart/loopEnd on the full buffer do exactly that */
+      if (loopPts) { node.loopStart = loopPts.start; node.loopEnd = loopPts.end; }
+      node.start(t0); return { duration: 999, stop() { try { node.stop(); } catch (e) {} } };
+    }
     node.start(t0);
     return { duration: (int16.length / srcRate) + 0.05, stop() { try { node.stop(); } catch (e) {} } };
   };
@@ -516,7 +523,7 @@ function MailLab(root) {
   const stepBtn = root.querySelector('[data-mail-step]');
   const STEPS = [
     { side: 'dsp', mail: 'AA / BB', text: 'IPL ROM signals ready: writes $AA to port 0 and $BB to port 1' },
-    { side: 'cpu', mail: '$CC → $2141', text: 'CPU sees AA/BB, writes a non-zero start value to port 1' },
+    { side: 'cpu', mail: '$01 → $2141', text: 'CPU sees AA/BB, writes a non-zero start value to port 1' },
     { side: 'cpu', mail: 'addr → $2142/3', text: 'CPU writes the ARAM transfer address (low, high)' },
     { side: 'cpu', mail: '$CC → $2140', text: '“begin” kick to port 0 — the IPL echoes it back' },
     { side: 'dsp', mail: 'echo $CC', text: 'IPL confirms; CPU streams driver + BRR bytes, bumping port 0' },
@@ -590,19 +597,24 @@ function DirLab(root) {
   const flat = BRR.flatten(blocks);
   const decoded = BRR.decode(flat);
   const startAddr = 0x2000, loopAddr = startAddr + 2 * 9; // loop after 2 blocks
+  const loopStartSample = 2 * 16; // 2 blocks × 16 samples — where the loop pointer lands
   info.innerHTML = `DIR entry [SRCN 0] → start <code>${hx(startAddr, 4)}</code>, loop <code>${hx(loopAddr, 4)}</code> · ${blocks.length} BRR blocks, END+LOOP set on the last`;
   root.querySelector('[data-dir-once]').addEventListener('click', () =>
     Engine.play('Sample · one-shot', playSamples(decoded, srcRate, 0, false), root));
   root.querySelector('[data-dir-loop]').addEventListener('click', () =>
-    Engine.play('Sample · looping on END flag', playSamples(decoded, srcRate, 0, true), root));
+    Engine.play('Sample · looping on END flag',
+      playSamples(decoded, srcRate, 0, true,
+        { start: loopStartSample / srcRate, end: decoded.length / srcRate }), root));
   whenVisible(root, v => { if (!v) Engine.stopIfOwner(root); });
 }
 
 /* Module 11 — hardware ADSR / GAIN register explorer with a live ENVX readout.
-   Attack/decay/release times use the S-DSP's documented rate tables. */
+   Attack, decay and sustain-rate times follow the S-DSP's documented rate
+   tables. (Key-off release is NOT in a table: on hardware it's a fixed linear
+   ramp of −1/256 full-scale per output sample, regardless of the sustain rate.) */
 const AR_TIME = [4.1, 2.6, 1.5, 1.0, 0.640, 0.380, 0.260, 0.160, 0.096, 0.064, 0.040, 0.024, 0.016, 0.010, 0.006, 0.001];
 const DR_TIME = [1.2, 0.74, 0.44, 0.29, 0.18, 0.11, 0.074, 0.037];
-const SR_TIME = [0, 38, 28, 24, 19, 14, 12, 9.4, 7.1, 5.9, 4.7, 3.5, 2.9, 2.4, 1.8, 1.5, 1.2, 0.88, 0.74, 0.59, 0.44, 0.37, 0.29, 0.22, 0.18, 0.15, 0.11, 0.074, 0.037, 0.018, 0.0037, 0.0018];
+const SR_TIME = [0, 38, 28, 24, 19, 14, 12, 9.4, 7.1, 5.9, 4.7, 3.5, 2.9, 2.4, 1.8, 1.5, 1.2, 0.88, 0.74, 0.59, 0.44, 0.37, 0.29, 0.22, 0.18, 0.15, 0.11, 0.092, 0.074, 0.055, 0.037, 0.018];
 function HwEnvLab(root) {
   const canvas = root.querySelector('.env-canvas'), c2 = canvas.getContext('2d');
   const AR = root.querySelector('[data-ar]'), DR = root.querySelector('[data-dr]'), SL = root.querySelector('[data-sl]'), SR = root.querySelector('[data-sr]');
@@ -615,7 +627,7 @@ function HwEnvLab(root) {
   function envAt(t, p) {
     if (t < p.at) return t / p.at;                                  // attack: linear rise to 1
     let e = 1, tt = t - p.at;
-    if (tt < p.dt) return 1 + (p.slv - 1) * (tt / p.dt);             // decay to sustain level
+    if (tt < p.dt) return p.slv + (1 - p.slv) * Math.exp(-3 * tt / p.dt); // decay: exponential fall to sustain level
     tt -= p.dt; e = p.slv;
     if (p.st <= 0) return e;                                         // SR=0 → hold forever
     return e * Math.exp(-tt / (p.st / 3));                          // sustain decay (exponential)
@@ -847,14 +859,14 @@ function SpcExecLab(root) {
   const h2 = v => '$' + (v & 0xFF).toString(16).toUpperCase().padStart(2, '0');
   let R, pc, halted, dsp, chg;
   const PROG = [
-    { a: 0xC00, k: 'MOV', o: 'X, #$4C', c: 'DSP address: VxVOL(L) of voice 0', x() { R.X = 0x4C; return ['X ← $4C — the DSP register address we’ll write.', ['X']]; } },
-    { a: 0xC02, k: 'MOV', o: '$F2, X', c: 'select DSP register via port $F2', x() { R.F2 = R.X; return ['Port $F2 ← X. The S-DSP address latch now points at VxVOL(L).', ['F2']]; } },
+    { a: 0xC00, k: 'MOV', o: 'X, #$00', c: 'DSP address: V0 VOL(L) is $00', x() { R.X = 0x00; return ['X ← $00 — the DSP register address of voice 0’s left volume.', ['X']]; } },
+    { a: 0xC02, k: 'MOV', o: '$F2, X', c: 'select DSP register via port $F2', x() { R.F2 = R.X; return ['Port $F2 ← X. The S-DSP address latch now points at V0 VOL(L) ($00).', ['F2']]; } },
     { a: 0xC04, k: 'MOV', o: 'A, #$7F', c: 'max left volume', x() { R.A = 0x7F; return ['A ← $7F — full left volume.', ['A']]; } },
-    { a: 0xC06, k: 'MOV', o: '$F3, A', c: 'write data via port $F3', x() { R.F3 = R.A; dsp[R.F2] = R.A; return ['Port $F3 ← A. The DSP stores $7F into register ' + h2(R.F2) + '.', ['F3']]; } },
-    { a: 0xC08, k: 'MOV', o: 'X, #$4D', c: 'VxVOL(R) of voice 0', x() { R.X = 0x4D; return ['X ← $4D — the right-volume register.', ['X']]; } },
-    { a: 0xC0A, k: 'MOV', o: '$F2, X', c: 'select it', x() { R.F2 = R.X; return ['Port $F2 ← $4D.', ['F2']]; } },
+    { a: 0xC06, k: 'MOV', o: '$F3, A', c: 'write data via port $F3', x() { R.F3 = R.A; dsp[R.F2] = R.A; return ['Port $F3 ← A. The DSP stores $7F into register ' + h2(R.F2) + ' — VOL(L).', ['F3']]; } },
+    { a: 0xC08, k: 'MOV', o: 'X, #$01', c: 'V0 VOL(R) is $01', x() { R.X = 0x01; return ['X ← $01 — voice 0’s right-volume register.', ['X']]; } },
+    { a: 0xC0A, k: 'MOV', o: '$F2, X', c: 'select it', x() { R.F2 = R.X; return ['Port $F2 ← $01.', ['F2']]; } },
     { a: 0xC0C, k: 'MOV', o: '$F3, A', c: 'same $7F to the right', x() { R.F3 = R.A; dsp[R.F2] = R.A; return ['Right volume ← $7F. The voice is centred and loud.', ['F3']]; } },
-    { a: 0xC0E, k: 'MOV', o: 'X, #$4C', c: 'KON register ($4C)', x() { R.X = 0x4C; return ['X ← $4C — actually KON, the key-on register.', ['X']]; } },
+    { a: 0xC0E, k: 'MOV', o: 'X, #$4C', c: 'KON — the global key-on register', x() { R.X = 0x4C; return ['X ← $4C — KON, the key-on register (one bit per voice).', ['X']]; } },
     { a: 0xC10, k: 'MOV', o: '$F2, X', c: 'select KON', x() { R.F2 = 0x4C; return ['Port $F2 ← $4C (KON).', ['F2']]; } },
     { a: 0xC12, k: 'MOV', o: 'A, #$01', c: 'bit 0 = voice 0', x() { R.A = 0x01; return ['A ← $01 — a 1 in bit 0 keys on voice 0.', ['A']]; } },
     { a: 0xC14, k: 'MOV', o: '$F3, A', c: 'KON ← 1: voice starts', x() { R.F3 = R.A; dsp[0x4C] = R.A; return ['KON ← $01. Voice 0 begins decoding its BRR sample — sound!', ['F3']]; } },
