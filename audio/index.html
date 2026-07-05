@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super NES Audio — a course on the S-SMP, SPC700 &amp; S-DSP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%237d5cf0%27/%3E%3Cpath d=%27M4 16 Q10 4 16 16 T28 16%27 fill=%27none%27 stroke=%27%2345e4d1%27 stroke-width=%272.4%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: digital audio from scratch, how the Super Nintendo's Sony S-SMP (SPC700) and S-DSP make sound — BRR samples, 8 voices, ADSR/GAIN, Gaussian interpolation and the 8-tap echo FIR — and how emulators recreate it. Every sound is synthesised live in your browser.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Super NES Audio</h1>
+        <span class="sub">A course · 16 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · Digital sound from zero</div>
+      <a href="#waves"><span class="n">01</span><span>Sound as waves</span></a>
+      <a href="#sampling"><span class="n">02</span><span>Sampling &amp; quantisation</span></a>
+      <a href="#harmonics"><span class="n">03</span><span>Waves add up</span></a>
+      <a href="#brr"><span class="n">04</span><span>ADPCM &amp; BRR</span></a>
+      <a href="#envelopes"><span class="n">05</span><span>Envelopes (ADSR)</span></a>
+      <a href="#pitch"><span class="n">06</span><span>Playing at any pitch</span></a>
+      <a href="#echo"><span class="n">07</span><span>Echo, reverb &amp; filters</span></a>
+
+      <div class="toc-group">Part II · The SNES sound hardware</div>
+      <a href="#ssmp"><span class="n">08</span><span>The S-SMP &amp; SPC700</span></a>
+      <a href="#sdsp"><span class="n">09</span><span>The S-DSP &amp; 8 voices</span></a>
+      <a href="#samples"><span class="n">10</span><span>Samples &amp; the directory</span></a>
+      <a href="#hwenv"><span class="n">11</span><span>ADSR &amp; GAIN on hardware</span></a>
+      <a href="#gauss"><span class="n">12</span><span>Pitch &amp; interpolation</span></a>
+      <a href="#fir"><span class="n">13</span><span>The echo unit &amp; FIR</span></a>
+      <a href="#drivers"><span class="n">14</span><span>Mixing &amp; music drivers</span></a>
+
+      <div class="toc-group">Part III · Emulating the chip</div>
+      <a href="#emulate"><span class="n">15</span><span>Emulating SPC700 + DSP</span></a>
+      <a href="#try"><span class="n">16</span><span>SPC files &amp; try it</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-scope" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · Sony S-SMP + S-DSP</span>
+          <h2>How the <span class="grad">Super Nintendo</span> made sound.</h2>
+          <p class="lede">
+            We start from the very beginning — what a digital sound even
+            <em>is</em> — assuming you know nothing about audio. Once the
+            vocabulary is solid, we open up Nintendo's little audio computer: the
+            <strong>SPC700</strong> CPU, its 64&nbsp;KB of private RAM, and the
+            <strong>S-DSP</strong> that decodes samples and mixes eight voices into
+            32&nbsp;kHz stereo. Sixteen modules, each with a <strong>live
+            synthesiser</strong> so you can hear every idea. No game audio ships
+            with this page; every sound is generated in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#waves">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <button class="btn" id="play-fanfare">Play a 16-bit fanfare</button>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>Digital sound from zero</h4>
+              <p>Waves, sampling, harmonics, compression, envelopes, pitch and echo — the universal vocabulary of digital audio, from scratch.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The SNES sound hardware</h4>
+              <p>The S-SMP two-computer split, the S-DSP's 8 voices, BRR samples, ADSR/GAIN, Gaussian interpolation and the echo FIR.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating the chip</h4>
+              <p>Two crystals, the CPU↔APU sync problem, and the SPC file format you can play today.</p>
+              <div class="cnt">2 modules · with labs</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>Digital sound from zero</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific chip
+            yet. It's the toolkit that <em>every</em> piece of digital audio gear is
+            built from, whether that's a phone, a CD player, or the little Sony chip
+            we'll meet in Part II. We build the vocabulary one word at a time —
+            wave, sample, harmonic, compression, envelope, pitch, echo — and you can
+            play and see each idea with a synthesised tone. If a term is ever used
+            before it's explained, that's a bug. Everything in Parts II and III is
+            just these ideas wired into silicon.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–07</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>7 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="waves">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>Sound as waves</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand what sound physically is, and the three numbers that describe any simple tone: frequency, amplitude and phase.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Let's start with what sound physically is. When something vibrates — a
+            guitar string, your vocal cords, a speaker cone — it pushes and pulls on
+            the surrounding air, making tiny, fast changes in air pressure. Those
+            changes ripple outward as a <strong>wave</strong> and reach your eardrum,
+            which vibrates in step. That's all sound is: a wobble in air pressure
+            over time.
+          </p>
+          <p>
+            To put that wobble in a computer we do something wonderfully simple. Many
+            thousands of times per second we measure the pressure and write the number
+            down. Each measurement is called a <span class="term" data-tip="One measurement of the wave's height at a single instant.">sample</span>.
+            String the samples together in order and you have the whole sound as a
+            plain list of numbers; feed that list back to a speaker at the same speed
+            and the sound reappears.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A flipbook</span>
+            <p>
+              A movie isn't really moving — it's a stack of still photos shown fast
+              enough that your eye fills in the motion. Digital sound works the same
+              way: each sample is a still &ldquo;photo&rdquo; of the wave's height at
+              one instant. Play the photos back quickly and smooth sound returns.
+              Take too few per second and, like a choppy movie, it comes out wrong —
+              that's Module 02.
+            </p>
+          </div>
+
+          <p>
+            Three numbers describe any simple wave. Its <strong>frequency</strong> is
+            how many times it repeats each second, measured in <strong>hertz</strong>
+            (Hz) — 440&nbsp;Hz means 440 cycles a second, and higher frequency means
+            higher pitch. Its <strong>amplitude</strong> is how far the wave swings
+            from rest — how loud it is. And its <span class="term" data-tip="Where in its cycle a wave starts — the same shape shifted left or right in time.">phase</span>
+            is where in the cycle it happens to start. Hold on to frequency and
+            amplitude; they run through the whole course.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 240" role="img" aria-label="A continuous pressure wave measured into a list of numbers">
+              <line x1="90" y1="100" x2="840" y2="100" class="d-grid"/>
+              <polyline class="d-wave-c" points="100,100 145,72 190,58 235,72 280,100 325,128 370,142 415,128 460,100 505,72 550,58 595,72 640,100 685,128 730,142 775,128 820,100"/>
+              <g>
+                <circle cx="100" cy="100" r="4.5" class="d-dot-v"/><line x1="100" y1="100" x2="100" y2="185" class="d-grid"/>
+                <circle cx="190" cy="58" r="4.5" class="d-dot-v"/><line x1="190" y1="58" x2="190" y2="185" class="d-grid"/>
+                <circle cx="280" cy="100" r="4.5" class="d-dot-v"/><line x1="280" y1="100" x2="280" y2="185" class="d-grid"/>
+                <circle cx="370" cy="142" r="4.5" class="d-dot-v"/><line x1="370" y1="142" x2="370" y2="185" class="d-grid"/>
+                <circle cx="460" cy="100" r="4.5" class="d-dot-v"/><line x1="460" y1="100" x2="460" y2="185" class="d-grid"/>
+                <circle cx="550" cy="58" r="4.5" class="d-dot-v"/><line x1="550" y1="58" x2="550" y2="185" class="d-grid"/>
+                <circle cx="640" cy="100" r="4.5" class="d-dot-v"/><line x1="640" y1="100" x2="640" y2="185" class="d-grid"/>
+                <circle cx="730" cy="142" r="4.5" class="d-dot-v"/><line x1="730" y1="142" x2="730" y2="185" class="d-grid"/>
+                <circle cx="820" cy="100" r="4.5" class="d-dot-v"/><line x1="820" y1="100" x2="820" y2="185" class="d-grid"/>
+              </g>
+              <text x="90" y="30" class="d-tag d-cyan">Continuous pressure wave</text>
+              <text x="90" y="205" class="d-sub">measured at each tick ↓ → a list of numbers</text>
+              <text x="500" y="30" text-anchor="start" class="d-sub">amplitude = height · frequency = cycles per second</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Sound as numbers.</strong> A smooth pressure wave is measured at regular ticks; each measurement — a <strong>sample</strong> — becomes one number. The wave's height is its amplitude; how fast it repeats is its frequency.</figcaption>
+          </figure>
+
+          <h4>The basic shapes</h4>
+          <p>
+            A synthesiser like the one on this page builds everything from a few
+            shapes. A <strong>sine</strong> is the purest tone — one frequency, no
+            extra colour, like a tuning fork. <strong>Square</strong> and
+            <strong>saw(tooth)</strong> are jagged and buzzy — those classic chiptune
+            &ldquo;bleeps&rdquo; — because they're secretly a sine plus a pile of
+            higher tones (Module 03). <strong>Triangle</strong> sits in between,
+            mellow but a little richer than a sine. <strong>Noise</strong> is every
+            frequency at once with no pitch — your &ldquo;shh&rdquo;: wind, static, a
+            snare. Play with the scope: switch shapes, sweep the frequency, and watch
+            the trace while you listen.
+          </p>
+
+          <div class="lab" id="lab-osc">
+            <div class="lab-head"><span class="dot"></span><span class="title">Signal lab — waveforms on a scope</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope trace of the selected waveform"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Waveform</label>
+                  <div class="seg-btns" role="group" aria-label="Waveform">
+                    <button class="on" data-shape="sine">sine</button>
+                    <button data-shape="square">square</button>
+                    <button data-shape="sawtooth">saw</button>
+                    <button data-shape="triangle">tri</button>
+                    <button data-shape="noise">noise</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Frequency — <span class="val" data-wave-freq-val>220 Hz</span></label>
+                  <input type="range" min="55" max="1760" value="220" step="1" data-wave-freq aria-label="Frequency">
+                </div>
+                <button class="play-btn" data-wave-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="lab-note">The trace is an <strong>oscilloscope</strong>: it draws amplitude (up/down) against time (left/right), so you're literally seeing the stream of sample values as a line.</p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Sound is a pressure wave; a digital signal is that wave measured as regularly-spaced numbers (samples).</li>
+              <li>Frequency = pitch (Hz); amplitude = loudness; phase = where the cycle starts.</li>
+              <li>Sine, square, saw, triangle and noise are the building blocks a synth combines.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#sampling"><span class="dir">Next →</span><span class="ttl">02 · Sampling &amp; quantisation</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="sampling">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Sampling &amp; quantisation</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn the two knobs of every digital format — sample rate and bit depth — and hear what happens when each is set too low.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Storing sound as numbers raises two questions. <em>How often</em> do we
+            measure, and <em>how precisely</em> do we write each measurement down?
+            The answers are the <strong>sample rate</strong> and the <strong>bit
+            depth</strong>, and together they define any audio format — including the
+            SNES's.
+          </p>
+          <p>
+            The sample rate is measured in samples per second, again in hertz. There's
+            a hard rule about it, the <span class="term" data-tip="You must sample at more than twice the highest frequency you want to capture, or that frequency folds back as a false lower tone.">Nyquist limit</span>:
+            to capture a frequency you must sample <em>more than twice</em> as fast.
+            Sample too slowly and high frequencies don't just vanish — they fold back
+            down and reappear as false, lower tones. That folding is called
+            <span class="term" data-tip="A false, lower tone created when a frequency above half the sample rate folds back into the audible range.">aliasing</span>,
+            and it sounds like a metallic, warbly grunge riding on top of the sound.
+          </p>
+
+          <div class="note hw">
+            <div class="ico">▸</div>
+            <div>
+              <p>
+                The S-DSP mixes all its voices internally and pushes out
+                <strong>16-bit stereo at 32&nbsp;000&nbsp;Hz</strong>. By Nyquist that
+                gives a ceiling of 16&nbsp;kHz — a touch shy of the ~20&nbsp;kHz limit
+                of young ears, which is part of why the SNES sounds warm and slightly
+                soft rather than crisp and clinical. Individual voices are usually
+                stored far below 32&nbsp;kHz to save precious RAM, then pitched up on
+                the fly (Module 06).
+              </p>
+            </div>
+          </div>
+
+          <p>
+            Bit depth is the other knob: how many distinct values a sample can take.
+            16-bit gives 65&nbsp;536 possible levels; drop to 8-bit and you have only
+            256, so every sample must snap to the nearest available rung. That rounding
+            is <span class="term" data-tip="Rounding each sample to the nearest available level; the error shows up as a gritty hiss called quantisation noise.">quantisation</span>,
+            and the error it introduces is heard as a gritty hiss — quantisation
+            noise. The lab below lets you strangle both knobs on a bright tone. Drop
+            the rate to hear aliasing; drop the bits to hear the crunch. The reference
+            button plays it back at the SNES's own 32&nbsp;kHz / 16-bit.
+          </p>
+
+          <div class="lab" id="lab-sampling">
+            <div class="lab-head"><span class="dot"></span><span class="title">Sampling lab — starve the two knobs</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope trace of the resampled, requantised tone"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Sample rate — <span class="val" data-rate-val>8.0 kHz</span></label>
+                  <input type="range" min="2000" max="32000" value="8000" step="500" data-rate aria-label="Sample rate">
+                </div>
+                <div class="ctrl">
+                  <label>Bit depth — <span class="val" data-bits-val>5-bit</span></label>
+                  <input type="range" min="2" max="16" value="5" step="1" data-bits aria-label="Bit depth">
+                </div>
+                <button class="play-btn" data-sampling-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play
+                </button>
+                <button class="play-btn" data-sampling-ref style="background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#120c22">Play at 32 kHz · 16-bit</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Sample rate = how often; the Nyquist limit is half the sample rate — above it, sound aliases.</li>
+              <li>Bit depth = how precisely; too few bits adds quantisation noise (a gritty hiss).</li>
+              <li>The S-DSP outputs 16-bit stereo at 32&nbsp;000&nbsp;Hz — a 16&nbsp;kHz ceiling, hence its warm tone.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#waves"><span class="dir">← Prev</span><span class="ttl">01 · Sound as waves</span></a>
+            <a class="next" href="#harmonics"><span class="dir">Next →</span><span class="ttl">03 · Waves add up</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="harmonics">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Waves add up</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See that every timbre is a sum of pure sine waves — the harmonics — and build tones by stacking them yourself.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            In Module 01 we said a square or saw wave is &ldquo;secretly a sine plus a
+            stack of higher tones.&rdquo; That wasn't a metaphor. It's one of the most
+            important facts in audio, and we owe it to the mathematician Fourier:
+            <strong>any sound, however complicated, is just a sum of simple sine waves
+            at different frequencies and volumes.</strong> Add the right sines and you
+            can build any waveform; pull a sound apart and you always find sines
+            underneath.
+          </p>
+          <p>
+            The lowest sine is the <strong>fundamental</strong> — the pitch you
+            actually hear. The sines stacked above it, at 2×, 3×, 4×&hellip; the
+            fundamental's frequency, are the <span class="term" data-tip="Whole-number multiples of the fundamental frequency (2×, 3×, 4×…). More or stronger harmonics = a brighter, buzzier tone.">harmonics</span>.
+            Their pattern of loudnesses is what makes a flute sound different from a
+            trumpet at the same pitch. A pure sine has no harmonics at all; a saw has
+            every harmonic, each a bit quieter than the last; a square has only the
+            odd ones.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A recipe</span>
+            <p>
+              The finished tone is a baked cake — you taste it all at once. The list of
+              harmonics is the <em>recipe</em>: two parts fundamental, one part second
+              harmonic, a pinch of the fifth. Change the amounts and you've baked a
+              different instrument. The mixer below is that recipe card, live.
+            </p>
+          </div>
+
+          <p>
+            Slide the first eight harmonics up and down and listen to the timbre
+            change, or hit a preset to snap to a sine, a saw, a square or a reedy
+            organ. This is <strong>additive synthesis</strong> — building sound by
+            piling sines up. (The SNES doesn't synthesise this way; it plays recorded
+            samples. But understanding harmonics is what lets you read <em>why</em> one
+            sample sounds bright and another dull.)
+          </p>
+
+          <div class="lab" id="lab-additive">
+            <div class="lab-head"><span class="dot"></span><span class="title">Additive lab — stack the harmonics</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope trace of the summed harmonics"></canvas>
+              <div class="harm-bank">
+                <div class="hcol"><span class="val">100%</span><input type="range" min="0" max="100" value="100" data-harm aria-label="Harmonic 1"><span class="hn">1×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 2"><span class="hn">2×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 3"><span class="hn">3×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 4"><span class="hn">4×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 5"><span class="hn">5×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 6"><span class="hn">6×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 7"><span class="hn">7×</span></div>
+                <div class="hcol"><span class="val">0%</span><input type="range" min="0" max="100" value="0" data-harm aria-label="Harmonic 8"><span class="hn">8×</span></div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-additive-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play the stack
+                </button>
+                <div class="seg-btns" role="group" aria-label="Presets">
+                  <button data-preset="sine">sine</button>
+                  <button data-preset="saw">saw</button>
+                  <button data-preset="square">square</button>
+                  <button data-preset="organ">organ</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Any tone = a sum of sine waves: a fundamental plus harmonics at whole-number multiples.</li>
+              <li>The pattern of harmonic loudnesses is the timbre — why a flute ≠ a trumpet.</li>
+              <li>Saw = all harmonics; square = odd harmonics only; sine = fundamental alone.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sampling"><span class="dir">← Prev</span><span class="ttl">02 · Sampling &amp; quantisation</span></a>
+            <a class="next" href="#brr"><span class="dir">Next →</span><span class="ttl">04 · ADPCM &amp; BRR</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="brr">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Squeezing samples: ADPCM &amp; BRR</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand ADPCM compression, then learn the SNES's exact BRR format — 9-byte blocks, four filters — by encoding and decoding a sound yourself.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SNES has only 64&nbsp;KB of audio RAM (Part II), so every sample must
+            be tiny. Raw 16-bit audio is far too fat, so the chip stores everything in
+            a compressed form. The trick is <strong>ADPCM</strong> — Adaptive
+            Differential PCM. Instead of storing each sample's full value, ADPCM
+            predicts the next sample from the previous ones and stores only the small
+            <em>correction</em>, in just a few bits. Sound changes smoothly, so the
+            corrections stay small, and a handful of bits is plenty.
+          </p>
+          <p>
+            The SNES's specific flavour is called <strong>BRR</strong> — Bit Rate
+            Reduction — and it's beautifully rigid. Samples are packed into
+            <strong>9-byte blocks, each holding exactly 16 samples</strong>. The first
+            byte is the <strong>header</strong>; the remaining eight bytes hold sixteen
+            <strong>4-bit signed nibbles</strong>, one per sample.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 220" role="img" aria-label="Layout of one 9-byte BRR block">
+              <text x="20" y="30" class="d-tag d-cyan">One BRR block — 9 bytes, 16 samples</text>
+              <!-- header byte -->
+              <rect x="20" y="50" width="150" height="60" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="95" y="44" text-anchor="middle" class="d-sub">byte 0 · header</text>
+              <line x1="95" y1="50" x2="95" y2="110" class="d-stroke-line" stroke-width="1"/>
+              <line x1="132" y1="50" x2="132" y2="110" class="d-stroke-line" stroke-width="1"/>
+              <line x1="151" y1="50" x2="151" y2="110" class="d-stroke-line" stroke-width="1"/>
+              <text x="57" y="78" text-anchor="middle" class="d-num" style="font-size:11px">shift</text>
+              <text x="57" y="94" text-anchor="middle" class="d-sub" style="font-size:9px">4b</text>
+              <text x="113" y="78" text-anchor="middle" class="d-num" style="font-size:11px">flt</text>
+              <text x="113" y="94" text-anchor="middle" class="d-sub" style="font-size:9px">2b</text>
+              <text x="141" y="82" text-anchor="middle" class="d-amber" style="font:600 9px/1 var(--mono)">L</text>
+              <text x="160" y="82" text-anchor="middle" class="d-magenta" style="font:600 9px/1 var(--mono)">E</text>
+              <!-- data bytes -->
+              <g>
+                <rect x="200" y="50" width="680" height="60" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+                <text x="540" y="44" text-anchor="middle" class="d-sub">bytes 1–8 · sixteen 4-bit nibbles (one per sample)</text>
+              </g>
+              <g class="d-num" style="font-size:11px" text-anchor="middle">
+                <text x="221" y="86">s0</text><text x="263" y="86">s1</text><text x="305" y="86">s2</text><text x="347" y="86">s3</text>
+                <text x="389" y="86">s4</text><text x="431" y="86">s5</text><text x="473" y="86">s6</text><text x="515" y="86">s7</text>
+                <text x="557" y="86">s8</text><text x="599" y="86">s9</text><text x="641" y="86">s10</text><text x="683" y="86">s11</text>
+                <text x="725" y="86">s12</text><text x="767" y="86">s13</text><text x="809" y="86">s14</text><text x="851" y="86">s15</text>
+              </g>
+              <text x="20" y="150" class="d-sub">header bits: <tspan class="d-cyan">shift/range</tspan> (4) · <tspan class="d-violet">filter select</tspan> (2) · <tspan class="d-amber">LOOP</tspan> (1) · <tspan class="d-magenta">END</tspan> (1)</text>
+              <text x="20" y="176" class="d-sub">decode: sampleₙ = (nibble ≪ shift ≫ 1) + filter(prev₁, prev₂)</text>
+              <text x="20" y="200" class="d-sub">≈ 16-bit PCM 32 bytes → 9 BRR bytes ≈ <tspan class="d-cyan">3.5 : 1</tspan></text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The BRR block.</strong> A header byte carries a 4-bit <strong>shift</strong> (how far to scale the nibbles), a 2-bit <strong>filter</strong> select, and the <strong>LOOP</strong> and <strong>END</strong> flags; eight data bytes hold the sixteen 4-bit samples.</figcaption>
+          </figure>
+
+          <p>
+            Decoding is where the &ldquo;adaptive&rdquo; and &ldquo;predictive&rdquo;
+            parts live. Each 4-bit nibble is first scaled up by the header's
+            <strong>shift</strong> (0–12). Then one of <strong>four filters</strong>
+            reconstructs the real sample by adding a prediction from the previous one
+            or two decoded outputs:
+          </p>
+          <ul>
+            <li><strong>Filter 0</strong> — no prediction; the nibble stands alone. Used at the start of a sample so nothing leaks in from before.</li>
+            <li><strong>Filter 1</strong> — adds about <code>0.94×</code> the previous sample. A gentle slope-follower.</li>
+            <li><strong>Filters 2 and 3</strong> — use the previous <em>two</em> samples for a stronger prediction, ideal for smooth, tonal material.</li>
+          </ul>
+          <p>
+            Two header flags finish the picture. <strong>END</strong> marks the last
+            block of a sample; <strong>LOOP</strong>, when set on that final block,
+            tells the hardware to jump back to a loop point instead of going silent
+            (Module 10). The whole scheme lands around a <strong>3.5&nbsp;:&nbsp;1</strong>
+            squeeze — 32 bytes of PCM become 9 bytes of BRR.
+          </p>
+
+          <p>
+            The lab actually runs a BRR codec. It synthesises a short plucked
+            waveform, encodes it to real 9-byte blocks (brute-forcing the best filter
+            and shift per block, exactly as tools like BRRtools do), then decodes and
+            plays it back. Compare the source with the decoded version — the loss is
+            audible but small — and inspect the block headers.
+          </p>
+
+          <div class="lab" id="lab-brr">
+            <div class="lab-head"><span class="dot"></span><span class="title">BRR codec — encode, decode, inspect</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Source pitch — <span class="val" data-brr-freq-val>440 Hz</span></label>
+                  <input type="range" min="110" max="880" value="440" step="10" data-brr-freq aria-label="Source pitch">
+                </div>
+                <button class="play-btn" data-brr-src>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Source
+                </button>
+                <button class="play-btn" data-brr-dec style="background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#120c22">Decoded BRR</button>
+              </div>
+              <div class="brr-stat" data-brr-stat></div>
+              <div class="brr-blocks" data-brr-blocks></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>ADPCM stores a prediction plus a small correction, not the full sample — cheap and compact.</li>
+              <li>BRR = 9-byte blocks of 16 samples: 1 header + 8 data bytes of 4-bit nibbles.</li>
+              <li>The header holds a 4-bit shift, a 2-bit filter select, and LOOP + END flags; four filters reconstruct from the previous 1–2 samples.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#harmonics"><span class="dir">← Prev</span><span class="ttl">03 · Waves add up</span></a>
+            <a class="next" href="#envelopes"><span class="dir">Next →</span><span class="ttl">05 · Envelopes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="envelopes">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>Envelopes — shaping a note over time</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how a note's loudness changes from start to finish, and the four-stage ADSR shape used to describe it.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A real note isn't a steady blast — its loudness changes from the moment it
+            starts to the moment it dies away. That loudness-over-time curve is the
+            <span class="term" data-tip="A curve describing how a note's loudness changes over its lifetime.">envelope</span>,
+            and it matters as much as the waveform. The very same tone with a slow,
+            swelling envelope becomes a string pad; with a sharp attack and quick decay
+            it becomes a plucked harp. Envelope is character.
+          </p>
+          <p>
+            The classic way to describe an envelope has four stages, abbreviated
+            <strong>ADSR</strong>:
+          </p>
+          <ul>
+            <li><strong>Attack</strong> — how quickly the note fades in to full volume when it starts.</li>
+            <li><strong>Decay</strong> — how quickly it then falls back to a held level.</li>
+            <li><strong>Sustain</strong> — the held <em>level</em> while the note is still on. (This is a loudness, not a time.)</li>
+            <li><strong>Release</strong> — how quickly it fades to silence once the note is let go.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Pressing a piano key</span>
+            <p>
+              Strike a piano key hard and the sound leaps up (<em>attack</em>), settles
+              back a little (<em>decay</em>), and hums at a steady level as long as you
+              hold the key (<em>sustain</em>). Lift your finger and it fades out
+              (<em>release</em>). A pipe organ has an almost instant attack and a sustain
+              that never droops; a plucked string has a fast attack and no sustain at
+              all. Same four stages, different settings.
+            </p>
+          </div>
+
+          <p>
+            Draw an envelope with the sliders below and hear it applied to a live tone.
+            Watch how the same sawtooth becomes a pluck, a pad, or a stab depending
+            only on the four numbers. In Part II you'll set these exact stages on the
+            S-DSP's hardware envelope registers (Module 11).
+          </p>
+
+          <div class="lab" id="lab-adsr">
+            <div class="lab-head"><span class="dot"></span><span class="title">Envelope lab — shape a note with ADSR</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="env-canvas" aria-label="Live drawing of the ADSR envelope shape"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Attack — <span class="val" data-a-val>8 ms</span></label>
+                  <input type="range" min="1" max="600" value="8" data-a aria-label="Attack">
+                </div>
+                <div class="ctrl">
+                  <label>Decay — <span class="val" data-d-val>140 ms</span></label>
+                  <input type="range" min="1" max="800" value="140" data-d aria-label="Decay">
+                </div>
+                <div class="ctrl">
+                  <label>Sustain — <span class="val" data-s-val>55 %</span></label>
+                  <input type="range" min="0" max="100" value="55" data-s aria-label="Sustain">
+                </div>
+                <div class="ctrl">
+                  <label>Release — <span class="val" data-r-val>260 ms</span></label>
+                  <input type="range" min="1" max="1200" value="260" data-r aria-label="Release">
+                </div>
+                <button class="play-btn" data-env-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play note
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An envelope is a note's loudness shaped over time; ADSR = Attack, Decay, Sustain, Release.</li>
+              <li>Sustain is a <em>level</em> (how loud while held), not a duration.</li>
+              <li>The same waveform with different envelopes becomes different-sounding instruments.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#brr"><span class="dir">← Prev</span><span class="ttl">04 · ADPCM &amp; BRR</span></a>
+            <a class="next" href="#pitch"><span class="dir">Next →</span><span class="ttl">06 · Playing at any pitch</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="pitch">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part I</span></span>
+          <h3>Playing at any pitch</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand resampling — playing one stored sample at many pitches — and why the quality of the interpolation matters.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A game can't store a separate recording for every note; there isn't the
+            RAM. Instead it stores one sample and plays it back <em>faster</em> for a
+            higher pitch or <em>slower</em> for a lower one. Reading a stored waveform
+            at a new speed is called <span class="term" data-tip="Reading a stored sample at a new rate to change its pitch.">resampling</span>,
+            and it's the beating heart of a sample-based sound chip.
+          </p>
+          <p>
+            The catch: to play back faster you need sample values <em>between</em> the
+            ones you stored — at fractional positions like &ldquo;sample 4.63.&rdquo;
+            You have to make up those in-between values, and how you do it is called
+            <strong>interpolation</strong>. The crudest method,
+            <strong>nearest-neighbour</strong>, just grabs whichever stored sample is
+            closest — cheap, but it produces a jagged, aliased buzz.
+            <strong>Linear</strong> interpolation draws a straight line between the two
+            neighbours — better, but corners in the signal still add grit.
+          </p>
+          <p>
+            The SNES uses something nicer: a <strong>4-point Gaussian
+            interpolation</strong>. For each fractional position it takes the four
+            nearest stored samples and blends them with weights read from a fixed
+            Gaussian-shaped table baked into the chip. The result is smooth, and it
+            gently rolls off the highest frequencies — which, along with the 32&nbsp;kHz
+            output, is the other half of why the SNES sounds so soft and round. Play
+            the same bright sweep through nearest and Gaussian and the difference is
+            immediate.
+          </p>
+
+          <div class="note">
+            <div class="ico">▸</div>
+            <div>
+              <p>
+                The resample speed is set by a per-voice 14-bit register,
+                <code>VxPITCH</code>. A value of <code>$1000</code> plays the sample at
+                its stored rate; double it to <code>$2000</code> and the voice plays an
+                octave up. We'll meet that register on real hardware in Module 12.
+              </p>
+            </div>
+          </div>
+
+          <div class="lab" id="lab-pitch">
+            <div class="lab-head"><span class="dot"></span><span class="title">Interpolation lab — nearest vs Gaussian</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="scope" aria-label="Oscilloscope trace of the resampled sweep"></canvas>
+              <div class="controls">
+                <span class="lab-note">A bright sweep &ldquo;stored at 32&nbsp;kHz&rdquo; resampled three ways. Listen to the highs:</span>
+                <div class="seg-btns" role="group" aria-label="Interpolation method">
+                  <button data-interp="nearest">nearest</button>
+                  <button data-interp="linear">linear</button>
+                  <button data-interp="gauss">4-pt Gaussian</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Resampling = playing one stored sample faster or slower to change its pitch.</li>
+              <li>Faster playback needs invented in-between values — that's interpolation.</li>
+              <li>Nearest is buzzy; the SNES's 4-point Gaussian is smooth and rolls off the highs (its warm sound).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#envelopes"><span class="dir">← Prev</span><span class="ttl">05 · Envelopes</span></a>
+            <a class="next" href="#echo"><span class="dir">Next →</span><span class="ttl">07 · Echo, reverb &amp; filters</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="echo">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part I</span></span>
+          <h3>Echo, reverb &amp; filters</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Build up delay, feedback and filtering — the three ingredients behind the SNES's signature reverb, before we meet the real echo unit.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The last big idea before the hardware is space. A sound in a room reaches
+            your ear directly, then again a moment later after bouncing off the walls,
+            and again and again, each bounce quieter. Recreate that and a dry, flat
+            sample suddenly sits in a cathedral. It's built from three simple parts.
+          </p>
+          <p>
+            The first is a <strong>delay line</strong>: a short memory that holds the
+            sound and plays it back a set number of milliseconds later. One delay gives
+            you a single echo. The second is <strong>feedback</strong>: route the delay's
+            output back into its own input, scaled down, and the echo repeats — each pass
+            quieter than the last — until it fades. Many overlapping, decaying echoes blur
+            into <span class="term" data-tip="The dense wash of countless overlapping echoes that makes a sound feel like it's in a room.">reverb</span>.
+          </p>
+          <p>
+            The third part is a <strong>filter</strong>. Real walls absorb high
+            frequencies more than low ones, so each echo should come back a little
+            duller than the last. A filter does exactly that. The most flexible kind is
+            an <span class="term" data-tip="Finite Impulse Response filter: a weighted sum of a few recent samples — the taps.">FIR filter</span>,
+            which builds each output sample as a weighted sum of the last few input
+            samples; the weights are called <strong>taps</strong>. Choose the taps and
+            you choose the filter's colour. The SNES bakes exactly this into its echo
+            hardware — an 8-tap FIR — which we'll design in Module 13.
+          </p>
+
+          <div class="lab" id="lab-echo">
+            <div class="lab-head"><span class="dot"></span><span class="title">Echo playground — delay + feedback</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Delay — <span class="val" data-echo-delay-val>180 ms</span></label>
+                  <input type="range" min="20" max="500" value="180" step="5" data-echo-delay aria-label="Delay time">
+                </div>
+                <div class="ctrl">
+                  <label>Feedback — <span class="val" data-echo-fb-val>45 %</span></label>
+                  <input type="range" min="0" max="92" value="45" step="1" data-echo-fb aria-label="Feedback">
+                </div>
+                <button class="play-btn" data-echo-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play a phrase
+                </button>
+              </div>
+              <span class="lab-note">Short delay + high feedback = a metallic tunnel; long delay + low feedback = discrete echoes. Changes apply live.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An echo is a delay line; feedback makes it repeat and decay.</li>
+              <li>Many overlapping decaying echoes blur into reverb — a sense of space.</li>
+              <li>An FIR filter is a weighted sum of recent samples (taps); it colours each echo. The SNES uses an 8-tap FIR.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#pitch"><span class="dir">← Prev</span><span class="ttl">06 · Playing at any pitch</span></a>
+            <a class="next" href="#ssmp"><span class="dir">Next →</span><span class="ttl">08 · The S-SMP &amp; SPC700</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The SNES sound hardware</h3>
+          <p>
+            Now we meet the silicon. The Super Nintendo's audio is handled by a
+            near-independent little computer, the Sony <strong>S-SMP</strong>, wired to
+            the <strong>S-DSP</strong> mixer. Every idea from Part I is about to become
+            a register: BRR blocks in RAM, eight hardware voices, ADSR and GAIN
+            envelopes, a 14-bit pitch, the 4-point Gaussian, and an echo unit with an
+            8-tap FIR. We'll go block by block — and every lab drives the real register
+            names and addresses.
+          </p>
+          <div class="part-meta"><span>Modules <b>08–14</b></span><span>Focus <b>Real registers</b></span><span>Labs <b>7 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="ssmp">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>The S-SMP &amp; the SPC700</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See that SNES audio is a second computer with its own CPU, RAM and boot ROM, talking to the main system through a four-byte mailbox.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here's the surprise that defines SNES audio: it isn't a peripheral, it's a
+            whole second computer. Sony's <strong>S-SMP</strong> package — often just
+            called the APU, the Audio Processing Unit — contains its own CPU, its own
+            memory, its own boot ROM, and the sound mixer, all running on a separate
+            crystal. The main SNES CPU can't reach into it directly at all.
+          </p>
+          <p>Inside the S-SMP:</p>
+          <ul>
+            <li>The <strong>SPC700</strong> — an 8-bit CPU running at roughly <strong>1.024&nbsp;MHz</strong>, with a small, quirky instruction set of its own.</li>
+            <li><strong>64&nbsp;KB of private audio RAM</strong> (ARAM) — the SPC700's entire world: driver code, the sample directory, all BRR samples, and the echo buffer share this one space.</li>
+            <li>Two <strong>timers</strong> the driver reads to keep musical time.</li>
+            <li>A 64-byte <strong>IPL boot ROM</strong> that runs at power-on and knows how to receive an upload.</li>
+            <li>The <strong>S-DSP</strong> (next module), which does the actual sample decoding and mixing.</li>
+          </ul>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="The two-computer split between the main SNES and the S-SMP">
+              <rect x="30" y="60" width="300" height="180" rx="12" class="d-fill-panel d-stroke-line" stroke-width="1.5"/>
+              <text x="180" y="90" text-anchor="middle" class="d-label">Main system</text>
+              <text x="180" y="114" text-anchor="middle" class="d-sub">65816 S-CPU · 21.477 MHz</text>
+              <text x="180" y="150" text-anchor="middle" class="d-sub">WRAM · PPU · cartridge</text>
+              <text x="180" y="188" text-anchor="middle" class="d-tag d-violet">uploads driver + samples,</text>
+              <text x="180" y="208" text-anchor="middle" class="d-tag d-violet">then just sends note events</text>
+
+              <rect x="570" y="40" width="310" height="220" rx="12" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="725" y="70" text-anchor="middle" class="d-label">S-SMP (APU)</text>
+              <rect x="590" y="84" width="130" height="46" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <text x="655" y="105" text-anchor="middle" class="d-tag d-cyan" style="font-size:11px">SPC700</text>
+              <text x="655" y="121" text-anchor="middle" class="d-sub" style="font-size:9px">~1.024 MHz</text>
+              <rect x="730" y="84" width="130" height="46" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <text x="795" y="105" text-anchor="middle" class="d-tag d-magenta" style="font-size:11px">S-DSP</text>
+              <text x="795" y="121" text-anchor="middle" class="d-sub" style="font-size:9px">8 voices · 32 kHz</text>
+              <rect x="590" y="140" width="270" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <text x="725" y="166" text-anchor="middle" class="d-tag" style="font-size:11px">64 KB ARAM · driver + samples + echo</text>
+              <rect x="590" y="192" width="130" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <text x="655" y="218" text-anchor="middle" class="d-sub" style="font-size:10px">2 timers</text>
+              <rect x="730" y="192" width="130" height="42" rx="8" class="d-fill-ground d-stroke-line" stroke-width="1.2"/>
+              <text x="795" y="218" text-anchor="middle" class="d-sub" style="font-size:10px">64-byte IPL ROM</text>
+
+              <!-- mailbox -->
+              <rect x="360" y="120" width="180" height="60" rx="9" class="d-fill-panel2 d-amber-s" stroke-width="1.6"/>
+              <text x="450" y="112" text-anchor="middle" class="d-sub">4-byte mailbox</text>
+              <text x="450" y="145" text-anchor="middle" class="d-amber" style="font:600 12px/1 var(--mono)">$2140–$2143</text>
+              <text x="450" y="166" text-anchor="middle" class="d-sub" style="font-size:10px">= $F4–$F7 on the SPC side</text>
+              <line x1="330" y1="150" x2="360" y2="150" class="d-amber-s" stroke-width="2"/>
+              <line x1="540" y1="150" x2="570" y2="150" class="d-amber-s" stroke-width="2"/>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two computers, four bytes between them.</strong> The main CPU and the S-SMP each run on their own clock and share nothing but a four-register mailbox — <code>$2140–$2143</code> on the CPU side, the same latches as <code>$F4–$F7</code> on the SPC700 side.</figcaption>
+          </figure>
+
+          <p>
+            All communication squeezes through those four mailbox ports. At power-on
+            the main CPU can't just poke samples into ARAM; it has to hand them over
+            through a handshake with the IPL boot ROM. The CPU uploads a
+            <strong>sound driver</strong> plus all the BRR samples, tells the SPC700
+            where to start, and from then on the APU runs on its own — the game only
+            sends short note events (&ldquo;play sample 5 at this pitch&rdquo;) whenever
+            the music demands. Step through that boot handshake below.
+          </p>
+
+          <div class="lab" id="lab-mail">
+            <div class="lab-head"><span class="dot"></span><span class="title">Boot handshake — one mail at a time</span><span class="badge">no audio · protocol</span></div>
+            <div class="lab-body">
+              <div class="mail-log" data-mail-log></div>
+              <div class="controls">
+                <button class="play-btn" data-mail-step>Step ▸</button>
+                <button class="surr-btn" data-mail-reset>Reset</button>
+                <span class="lab-note" data-mail-note></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>SNES audio is a near-independent computer: SPC700 CPU + 64 KB ARAM + timers + IPL ROM + the S-DSP.</li>
+              <li>Main CPU and APU share only a 4-byte mailbox — <code>$2140–$2143</code> (CPU) / <code>$F4–$F7</code> (SPC).</li>
+              <li>The CPU uploads a driver and samples via the IPL boot handshake, then the APU plays on its own.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#echo"><span class="dir">← Prev</span><span class="ttl">07 · Echo, reverb &amp; filters</span></a>
+            <a class="next" href="#sdsp"><span class="dir">Next →</span><span class="ttl">09 · The S-DSP &amp; 8 voices</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="sdsp">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The S-DSP &amp; its 8 voices</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the mixer: eight independent hardware voices, the 128-byte register file that controls them, and how they sum to 32 kHz stereo.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The <strong>S-DSP</strong> is the part that actually makes sound. It runs
+            <strong>eight independent voices</strong>, and every voice is a little
+            assembly line: it reads a BRR sample from ARAM, resamples it to the wanted
+            pitch (the Gaussian of Module 06), shapes it with an envelope (ADSR or
+            GAIN), and scales it by a left and a right volume. All eight results are
+            summed and pushed out as one 16-bit stereo pair, 32&nbsp;000 times a second.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="One S-DSP voice pipeline, times eight, summed to stereo">
+              <text x="20" y="30" class="d-tag d-cyan">One voice (×8)</text>
+              <g>
+                <rect x="20" y="50" width="140" height="52" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="90" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">BRR source</text>
+                <text x="90" y="90" text-anchor="middle" class="d-sub" style="font-size:9px">VxSRCN · from DIR</text>
+                <text x="172" y="80" text-anchor="middle" class="d-flow">→</text>
+                <rect x="186" y="50" width="140" height="52" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="256" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">pitch / resample</text>
+                <text x="256" y="90" text-anchor="middle" class="d-sub" style="font-size:9px">VxPITCH · Gaussian</text>
+                <text x="338" y="80" text-anchor="middle" class="d-flow">→</text>
+                <rect x="352" y="50" width="140" height="52" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="422" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">envelope</text>
+                <text x="422" y="90" text-anchor="middle" class="d-sub" style="font-size:9px">VxADSR / VxGAIN</text>
+                <text x="504" y="80" text-anchor="middle" class="d-flow">→</text>
+                <rect x="518" y="50" width="140" height="52" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.4"/>
+                <text x="588" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">L / R volume</text>
+                <text x="588" y="90" text-anchor="middle" class="d-sub" style="font-size:9px">VxVOL L/R</text>
+                <text x="670" y="80" text-anchor="middle" class="d-flow">→</text>
+              </g>
+              <rect x="684" y="40" width="120" height="150" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.6"/>
+              <text x="744" y="70" text-anchor="middle" class="d-label" style="font-size:13px">Σ mix</text>
+              <text x="744" y="92" text-anchor="middle" class="d-sub" style="font-size:10px">all 8 voices</text>
+              <text x="744" y="120" text-anchor="middle" class="d-sub" style="font-size:10px">× MVOL L/R</text>
+              <text x="744" y="150" text-anchor="middle" class="d-tag d-cyan" style="font-size:11px">16-bit</text>
+              <text x="744" y="168" text-anchor="middle" class="d-tag d-cyan" style="font-size:11px">32 kHz stereo</text>
+              <g opacity="0.5">
+                <rect x="20" y="118" width="638" height="18" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <rect x="20" y="142" width="638" height="18" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <rect x="20" y="166" width="638" height="18" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+              </g>
+              <text x="20" y="220" class="d-sub">…voices 2–8 identical, each with its own registers · global KON/KOFF start &amp; stop them</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The voice assembly line.</strong> Source → pitch → envelope → volume, eight times over, summed and scaled by the master volume into 32&nbsp;kHz stereo.</figcaption>
+          </figure>
+
+          <p>
+            The S-DSP is controlled entirely through a <strong>128-byte register
+            file</strong>, addressed <code>$00</code>–<code>$7F</code>. It's laid out
+            cleverly: the low nibble of the address picks a field, the high nibble picks
+            the voice, so each voice gets a tidy 16-byte row. Per voice you get:
+          </p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Register</th><th>Address (voice x)</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">VxVOL L / R</span></td><td><code>$x0 / $x1</code></td><td>left and right volume for the voice (signed)</td></tr>
+                <tr><td><span class="pill ax">VxPITCH</span></td><td><code>$x2 / $x3</code></td><td>14-bit resample rate — the pitch</td></tr>
+                <tr><td><span class="pill ax">VxSRCN</span></td><td><code>$x4</code></td><td>which sample to play (index into the directory)</td></tr>
+                <tr><td><span class="pill ax">VxADSR1/2</span></td><td><code>$x5 / $x6</code></td><td>the ADSR envelope settings</td></tr>
+                <tr><td><span class="pill ax">VxGAIN</span></td><td><code>$x7</code></td><td>the alternative GAIN envelope mode</td></tr>
+                <tr><td><span class="pill util">VxENVX / VxOUTX</span></td><td><code>$x8 / $x9</code></td><td>read-back: current envelope level and output</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The rest of the file is <strong>global</strong>: <code>KON</code>/<code>KOFF</code>
+            key voices on and off (one bit each), <code>FLG</code> holds mute/reset and
+            the noise clock, <code>MVOLL/R</code> and <code>EVOLL/R</code> are the master
+            and echo volumes, <code>PMON</code>/<code>NON</code>/<code>EON</code> enable
+            pitch-modulation, noise and echo per voice, <code>DIR</code> points at the
+            sample directory (Module 10), <code>ESA</code>/<code>EDL</code> place the echo
+            buffer (Module 13), and <code>C0</code>–<code>C7</code> are the echo FIR taps.
+            Toggle the eight voices below and hear them sum.
+          </p>
+
+          <div class="lab" id="lab-voices">
+            <div class="lab-head"><span class="dot"></span><span class="title">8-voice mixer — the whole S-DSP</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="mixer">
+                <div class="strip" data-freq="130.81" data-type="triangle"><span class="name">V1</span><span class="sub">tri</span><input type="range" class="fader" min="0" max="100" value="70" aria-label="V1 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V1 pitch"><button class="venable on">ON</button></div>
+                <div class="strip" data-freq="164.81" data-type="sawtooth"><span class="name">V2</span><span class="sub">saw</span><input type="range" class="fader" min="0" max="100" value="55" aria-label="V2 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V2 pitch"><button class="venable on">ON</button></div>
+                <div class="strip" data-freq="196.00" data-type="square"><span class="name">V3</span><span class="sub">sqr</span><input type="range" class="fader" min="0" max="100" value="45" aria-label="V3 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V3 pitch"><button class="venable on">ON</button></div>
+                <div class="strip" data-freq="261.63" data-type="sine"><span class="name">V4</span><span class="sub">sin</span><input type="range" class="fader" min="0" max="100" value="60" aria-label="V4 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V4 pitch"><button class="venable on">ON</button></div>
+                <div class="strip" data-freq="329.63" data-type="triangle"><span class="name">V5</span><span class="sub">tri</span><input type="range" class="fader" min="0" max="100" value="50" aria-label="V5 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V5 pitch"><button class="venable">OFF</button></div>
+                <div class="strip" data-freq="392.00" data-type="sawtooth"><span class="name">V6</span><span class="sub">saw</span><input type="range" class="fader" min="0" max="100" value="50" aria-label="V6 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V6 pitch"><button class="venable">OFF</button></div>
+                <div class="strip" data-freq="523.25" data-type="square"><span class="name">V7</span><span class="sub">sqr</span><input type="range" class="fader" min="0" max="100" value="40" aria-label="V7 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V7 pitch"><button class="venable">OFF</button></div>
+                <div class="strip" data-freq="659.25" data-type="sine"><span class="name">V8</span><span class="sub">sin</span><input type="range" class="fader" min="0" max="100" value="35" aria-label="V8 volume"><input type="range" class="pitch" min="-1200" max="1200" value="0" aria-label="V8 pitch"><button class="venable">OFF</button></div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-voices-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play the mix
+                </button>
+                <span class="lab-note">ON/OFF keys each voice · tall slider = volume · wide slider = pitch (±1 octave). Changes apply live.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The S-DSP mixes 8 voices — each source → pitch → envelope → L/R volume — into 32 kHz stereo.</li>
+              <li>A 128-byte register file (<code>$00–$7F</code>) controls it: 16 bytes per voice plus global registers.</li>
+              <li><code>KON</code>/<code>KOFF</code> start and stop voices; <code>MVOL</code> sets the master volume.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#ssmp"><span class="dir">← Prev</span><span class="ttl">08 · The S-SMP &amp; SPC700</span></a>
+            <a class="next" href="#samples"><span class="dir">Next →</span><span class="ttl">10 · Samples &amp; the directory</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="samples">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>BRR samples &amp; the sample directory</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Follow how the DSP locates a sample in ARAM through the directory table, and how the LOOP flag makes a short sample sustain forever.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A voice's <code>VxSRCN</code> register just says &ldquo;play sample
+            number 5.&rdquo; How does the DSP turn that number into an address in
+            ARAM? Through a lookup table called the <strong>sample directory</strong>.
+            The global <code>DIR</code> register holds the high byte of where that
+            table lives, and each entry is four bytes: a <strong>start</strong> pointer
+            and a <strong>loop</strong> pointer, both 16-bit. <code>VxSRCN</code> is
+            simply the index into it.
+          </p>
+          <p>
+            So keying a voice on does this: read <code>VxSRCN</code>, jump to
+            <code>DIR</code>'s table, pull out the start and loop addresses for that
+            entry, and begin decoding BRR blocks from the start address. The hardware
+            walks block after block until it hits one with the <strong>END</strong>
+            flag set. What happens next depends on the <strong>LOOP</strong> flag in
+            that same header:
+          </p>
+          <ul>
+            <li><strong>END set, LOOP clear</strong> — the voice goes silent. This is a one-shot: a drum hit, a footstep.</li>
+            <li><strong>END set, LOOP set</strong> — the voice jumps to the <em>loop</em> pointer and keeps decoding. This is how a half-second recording of a violin sustains for as long as the note is held.</li>
+          </ul>
+          <p>
+            That loop pointer usually lands partway into the sample — a short attack
+            plays once, then a small steady-state section repeats forever. It's the
+            single most important trick for fitting real instruments into 64&nbsp;KB.
+            The lab decodes a real looping BRR sample and lets you play it once or
+            hold the loop.
+          </p>
+
+          <div class="lab" id="lab-dir">
+            <div class="lab-head"><span class="dot"></span><span class="title">Sample directory + looping playback</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="reg-line" data-dir-info></div>
+              <div class="controls">
+                <button class="play-btn" data-dir-once>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play once (END, no loop)
+                </button>
+                <button class="play-btn" data-dir-loop style="background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#120c22">Hold the loop</button>
+              </div>
+              <span class="lab-note">&ldquo;Hold the loop&rdquo; keeps decoding from the loop pointer on the END flag — press play elsewhere or scroll away to stop.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><code>DIR</code> points at a table of {start, loop} pointers; <code>VxSRCN</code> indexes it.</li>
+              <li>The DSP decodes BRR blocks from the start pointer until it sees the END flag.</li>
+              <li>END + LOOP jumps to the loop pointer, so a tiny sample can sustain indefinitely.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sdsp"><span class="dir">← Prev</span><span class="ttl">09 · The S-DSP &amp; 8 voices</span></a>
+            <a class="next" href="#hwenv"><span class="dir">Next →</span><span class="ttl">11 · ADSR &amp; GAIN on hardware</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="hwenv">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>ADSR &amp; GAIN on hardware</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Set the S-DSP's real envelope registers bit by bit — the ADSR fields and the GAIN modes — and watch the ENVX level readback move.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 05 drew envelopes as smooth curves. On the S-DSP an envelope is a
+            handful of bits, and there are two ways to make one. The first is
+            hardware <strong>ADSR</strong>, packed into two registers per voice:
+          </p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Register</th><th>Bits</th><th>Field</th></tr></thead>
+              <tbody>
+                <tr><td rowspan="2"><code>VxADSR1</code> ($x5)</td><td>bit 7</td><td>1 = use ADSR (0 = use GAIN instead)</td></tr>
+                <tr><td>bits 6–4 / 3–0</td><td>decay rate (3 bits) · attack rate (4 bits)</td></tr>
+                <tr><td rowspan="2"><code>VxADSR2</code> ($x6)</td><td>bits 7–5</td><td>sustain level (3 bits, in eighths)</td></tr>
+                <tr><td>bits 4–0</td><td>sustain rate (5 bits) — the release/decay-toward-zero speed</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The rates aren't times in milliseconds — they're indices into a fixed
+            rate table in the chip. A higher attack rate means a faster attack; the
+            fastest is nearly instant, the slowest takes several seconds. Attack rises
+            linearly; decay and the sustain phase fall <em>exponentially</em>, which is
+            why SNES notes taper so naturally. Sustain rate 0 is special: it means
+            &ldquo;hold the sustain level forever,&rdquo; used for organ-like tones.
+          </p>
+          <p>
+            The alternative is <strong>GAIN</strong> mode (bit 7 of ADSR1 cleared).
+            GAIN gives the driver hands-on control: a <em>direct</em> mode sets the
+            level outright, and four <em>ramp</em> modes slide the level up or down —
+            linearly or with a &ldquo;bent&rdquo; curve that eases off near the ends.
+            Drivers use GAIN for effects ADSR can't express, like a slow fade-in or a
+            custom multi-stage envelope. Either way, the chip exposes the current
+            envelope level in the read-only <code>VxENVX</code> register (0–127) — the
+            <strong>ENVX</strong> readout the lab tracks live.
+          </p>
+
+          <div class="lab" id="lab-hwenv">
+            <div class="lab-head"><span class="dot"></span><span class="title">Envelope register explorer</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="env-canvas" aria-label="Hardware ADSR envelope with a live playhead"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>Attack rate — <span class="val" data-ar-val>13</span></label><input type="range" min="0" max="15" value="13" data-ar aria-label="Attack rate"></div>
+                <div class="ctrl"><label>Decay rate — <span class="val" data-dr-val>4</span></label><input type="range" min="0" max="7" value="4" data-dr aria-label="Decay rate"></div>
+                <div class="ctrl"><label>Sustain level — <span class="val" data-sl-val>5</span></label><input type="range" min="0" max="7" value="5" data-sl aria-label="Sustain level"></div>
+                <div class="ctrl"><label>Sustain rate — <span class="val" data-sr-val>18</span></label><input type="range" min="0" max="31" value="18" data-sr aria-label="Sustain rate"></div>
+              </div>
+              <div class="row-wrap">
+                <button class="play-btn" data-hwenv-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play note
+                </button>
+                <span class="reg-line" data-hwenv-reg></span>
+                <span class="envx-box" data-hwenv-envx>ENVX —</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li><code>VxADSR1/2</code> pack attack rate, decay rate, sustain level and sustain rate into bit-fields (rates are table indices, not times).</li>
+              <li>Clearing ADSR1 bit 7 switches to <code>VxGAIN</code>: direct level or linear/bent up/down ramps.</li>
+              <li><code>VxENVX</code> reads back the current envelope level (0–127) at any instant.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#samples"><span class="dir">← Prev</span><span class="ttl">10 · Samples &amp; the directory</span></a>
+            <a class="next" href="#gauss"><span class="dir">Next →</span><span class="ttl">12 · Pitch &amp; interpolation</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="gauss">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Pitch, Gaussian interpolation &amp; modulation</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Watch the 4-point Gaussian slide across stored samples, and meet two extras: pitch modulation and the noise generator.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Back in Module 06 we heard why interpolation matters. Here's how the
+            S-DSP actually does it. For each output sample the chip needs a value at a
+            fractional position between stored samples. It takes the
+            <strong>four</strong> nearest stored samples — two behind, two ahead — and
+            multiplies each by a weight read from a fixed 512-entry
+            <strong>Gaussian table</strong> indexed by the fractional part of
+            <code>VxPITCH</code>. Sum the four weighted taps and that's the output.
+          </p>
+          <p>
+            Drag the position below and watch the four active taps slide along the
+            stored samples, their weights (<code>g0…g3</code>) shifting as the read
+            head moves. Because the Gaussian is broad and smooth, it quietly attenuates
+            the highest frequencies — the mathematical root of the SNES's soft treble.
+          </p>
+
+          <div class="lab" id="lab-gauss">
+            <div class="lab-head"><span class="dot"></span><span class="title">Gaussian interpolation visualiser</span><span class="badge">interactive · live</span></div>
+            <div class="lab-body">
+              <canvas class="gauss-canvas" aria-label="Four Gaussian taps sliding across stored samples"></canvas>
+              <div class="gauss-w" data-gauss-w></div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Read position — <span class="val" data-gauss-pos-val>3.00</span></label>
+                  <input type="range" min="1" max="6" value="3" step="0.01" data-gauss-pos aria-label="Read position">
+                </div>
+                <button class="play-btn" data-gauss-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Hear Gaussian
+                </button>
+                <button class="surr-btn" data-gauss-play-near>Hear nearest</button>
+              </div>
+            </div>
+          </div>
+
+          <p>
+            Two more features ride on the pitch machinery.
+            <strong>Pitch modulation</strong> (<code>PMON</code>) lets voice
+            <em>N</em>'s output continuously bend the pitch of voice <em>N+1</em> — a
+            cheap way to make growling, vibrato-rich, or metallic sounds without extra
+            samples. And the <strong>noise generator</strong> (<code>NON</code>)
+            replaces a voice's sample with pseudo-random noise, clocked at a rate set
+            in the <code>FLG</code> register — the source of wind, surf, cymbals and
+            explosions. Both are per-voice enable bits, so a game can mix tonal voices,
+            a modulated voice and a noise voice in the same eight.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The S-DSP resamples with a 4-point Gaussian: four taps weighted by a fixed table indexed by the pitch fraction.</li>
+              <li>The Gaussian's smoothness rolls off highs — the technical reason for the SNES's warm tone.</li>
+              <li><code>PMON</code> lets one voice modulate the next voice's pitch; <code>NON</code> swaps a voice for the noise generator.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hwenv"><span class="dir">← Prev</span><span class="ttl">11 · ADSR &amp; GAIN on hardware</span></a>
+            <a class="next" href="#fir"><span class="dir">Next →</span><span class="ttl">13 · The echo unit &amp; FIR</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="fir">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part II</span></span>
+          <h3>The echo unit &amp; the 8-tap FIR</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Assemble the signature SNES reverb from an ARAM echo buffer, feedback, and an 8-tap FIR filter you design tap by tap.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The lush reverb in so much SNES music comes from one dedicated block: the
+            <strong>echo unit</strong>. It's the delay-feedback-filter machine of
+            Module 07, built into the chip. The delay lives in a circular
+            <strong>echo buffer inside ARAM</strong>: the <code>ESA</code> register
+            sets its start page and <code>EDL</code> sets its length (in 16&nbsp;ms
+            steps). Because it sits in the same 64&nbsp;KB as the samples, a long echo
+            eats memory the samples could have used — a constant trade-off for SNES
+            composers.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 180" role="img" aria-label="ARAM shared between driver, samples and the echo buffer">
+              <text x="20" y="28" class="d-tag d-cyan">64 KB ARAM — one shared space</text>
+              <rect x="20" y="44" width="150" height="46" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.3"/>
+              <text x="95" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">driver code</text>
+              <rect x="176" y="44" width="120" height="46" rx="8" class="d-fill-panel2 d-stroke-line" stroke-width="1.3"/>
+              <text x="236" y="66" text-anchor="middle" class="d-tag" style="font-size:11px">DIR table</text>
+              <text x="236" y="82" text-anchor="middle" class="d-sub" style="font-size:9px">pointers</text>
+              <rect x="302" y="44" width="330" height="46" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/>
+              <text x="467" y="72" text-anchor="middle" class="d-tag" style="font-size:11px">BRR sample data</text>
+              <rect x="638" y="44" width="242" height="46" rx="8" class="d-fill-ground d-magenta-s" stroke-width="1.6"/>
+              <text x="759" y="66" text-anchor="middle" class="d-magenta" style="font:600 11px/1 var(--mono)">echo buffer</text>
+              <text x="759" y="82" text-anchor="middle" class="d-sub" style="font-size:9px">ESA start · EDL length</text>
+              <text x="638" y="118" class="d-sub" style="font-size:10px">↑ echo steals RAM from samples — longer reverb = fewer/smaller instruments</text>
+              <text x="20" y="150" class="d-sub">echo return → 8-tap FIR (C0…C7) → × EFB feedback → back into the buffer → × EVOL into the mix</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The echo detour.</strong> Output is written into the ARAM echo buffer; on the way back it passes through the 8-tap FIR, is scaled by feedback (<code>EFB</code>) into the buffer again, and by echo volume (<code>EVOL</code>) into the final mix.</figcaption>
+          </figure>
+
+          <p>
+            Each pass through the buffer is scaled by the feedback register
+            <code>EFB</code> before being written back — that's what makes the echo
+            repeat and decay. And crucially, on the way out the echo signal runs
+            through an <strong>8-tap FIR filter</strong> whose coefficients are the
+            global registers <code>C0</code>–<code>C7</code>. Those eight signed taps
+            let the driver shape the echo's tone: a gentle low-pass for a warm hall, or
+            odd taps for a metallic ring. Design the filter below — set the eight taps,
+            the delay and the feedback — and hear the reverb while the tap stems and the
+            filter's frequency response plot update live.
+          </p>
+
+          <div class="lab" id="lab-fir">
+            <div class="lab-head"><span class="dot"></span><span class="title">8-tap FIR designer + echo</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <canvas class="fir-canvas" aria-label="FIR taps and frequency response"></canvas>
+              <div class="fir-bank">
+                <div class="fcol"><input type="range" min="-100" max="127" value="64" data-fir aria-label="C0"><span class="fn">C0</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="36" data-fir aria-label="C1"><span class="fn">C1</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="18" data-fir aria-label="C2"><span class="fn">C2</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="8" data-fir aria-label="C3"><span class="fn">C3</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="2" data-fir aria-label="C4"><span class="fn">C4</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C5"><span class="fn">C5</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C6"><span class="fn">C6</span></div>
+                <div class="fcol"><input type="range" min="-100" max="127" value="0" data-fir aria-label="C7"><span class="fn">C7</span></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl"><label>Delay — <span class="val" data-fir-delay-val>160 ms</span></label><input type="range" min="16" max="480" value="160" step="16" data-fir-delay aria-label="Echo delay"></div>
+                <div class="ctrl"><label>Feedback (EFB) — <span class="val" data-fir-fb-val>50 %</span></label><input type="range" min="0" max="90" value="50" data-fir-fb aria-label="Feedback"></div>
+                <div class="seg-btns" role="group" aria-label="FIR presets"><button data-fir-preset="lp">low-pass</button><button data-fir-preset="hp">bright</button><button data-fir-preset="none">bypass</button></div>
+                <button class="play-btn" data-fir-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play with echo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The echo buffer lives in ARAM: <code>ESA</code> sets its start, <code>EDL</code> its length — it competes with sample data.</li>
+              <li><code>EFB</code> feeds the echo back on itself (decay); <code>EVOL</code> mixes it into the output.</li>
+              <li>An 8-tap FIR (<code>C0–C7</code>) colours the echo return — the SNES's signature tunable reverb.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#gauss"><span class="dir">← Prev</span><span class="ttl">12 · Pitch &amp; interpolation</span></a>
+            <a class="next" href="#drivers"><span class="dir">Next →</span><span class="ttl">14 · Mixing &amp; music drivers</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="drivers">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part II</span></span>
+          <h3>Mixing it all &amp; music drivers</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the final mix comes together, and how a music driver on the SPC700 turns a song into a stream of register writes.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Follow one sample through to the speaker. Each of the eight voices is
+            scaled by its <code>VxVOL</code> left and right, summed, and multiplied by
+            the master volume <code>MVOLL/R</code>. In parallel, the echo return is
+            scaled by <code>EVOLL/R</code> and added in. The result is clamped to 16
+            bits and clocked out as the stereo pair, 32&nbsp;000 times a second. That's
+            the whole output stage — a handful of multiplies and adds, done in
+            hardware.
+          </p>
+          <p>
+            But the S-DSP has no idea what a &ldquo;song&rdquo; is. It only knows
+            registers. Turning sheet music into register writes is the job of a
+            <strong>music driver</strong> — a program running on the SPC700 that the
+            game uploaded at boot. Every musical tick it reads a sequence of note
+            events and translates them: load <code>VxSRCN</code> and <code>VxPITCH</code>
+            for the instrument and note, set the volumes, choose an envelope, then write
+            a bit into <code>KON</code> to key the voice on. Timers keep the tempo.
+          </p>
+          <p>
+            Different studios wrote different drivers. Nintendo's own is often called
+            the <strong>N-SPC / Kankichi</strong> engine (heard across first-party
+            games); Rare, Konami, Square and others shipped their own, each with its
+            own effects and sequence format. They all boil down to the same loop:
+            <em>read events → write DSP registers → wait for the timer</em>. The lab is
+            a tiny four-voice tracker doing exactly that — toggle steps and each active
+            cell fires a <code>KON</code> write on the beat.
+          </p>
+
+          <div class="lab" id="lab-tracker">
+            <div class="lab-head"><span class="dot"></span><span class="title">Tiny driver — a 16-step pattern</span><span class="badge">Web Audio · live</span></div>
+            <div class="lab-body">
+              <div class="tracker" data-track-grid></div>
+              <div class="controls">
+                <button class="play-btn" data-track-play>
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  Play / stop
+                </button>
+                <div class="ctrl"><label>Tempo — <span class="val" data-track-tempo-val>120 BPM</span></label><input type="range" min="70" max="200" value="120" data-track-tempo aria-label="Tempo"></div>
+                <span class="track-pos" data-track-pos>stopped</span>
+              </div>
+              <span class="lab-note">Each lit cell = a note event → a <code>KON</code> write on that step. Edit while it plays.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Final mix = Σ(voice × VxVOL) × MVOL, plus echo × EVOL, clamped to 16-bit, at 32 kHz.</li>
+              <li>A music driver on the SPC700 turns note events into register writes and keys voices with <code>KON</code>.</li>
+              <li>Studios wrote their own drivers (Nintendo's N-SPC and many others) over the same DSP.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#fir"><span class="dir">← Prev</span><span class="ttl">13 · The echo unit &amp; FIR</span></a>
+            <a class="next" href="#emulate"><span class="dir">Next →</span><span class="ttl">15 · Emulating SPC700 + DSP</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating the chip</h3>
+          <p>
+            To hear SNES music on a modern machine, an emulator has to recreate two
+            synchronised computers cycle by cycle — and then package the result so you
+            can share a song as a tiny file. These last two modules cover the timing
+            problem at the heart of accurate SNES audio emulation, and the SPC file
+            format that lets a five-kilobyte download play a full track.
+          </p>
+          <div class="part-meta"><span>Modules <b>15–16</b></span><span>Tools <b>bsnes · snes9x</b></span><span>Labs <b>2 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="emulate">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>Emulating the SPC700 + DSP</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand why accurate SNES audio means running two clocks in lock-step, and see the SPC700 execute a driver's register writes by hand.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            An emulator that wants SNES music to sound right can't fake the audio chip
+            — it has to <em>run</em> it. That means two problems at once. First, there
+            are <strong>two crystals</strong>: the main system runs at
+            21.477&nbsp;MHz while the S-SMP runs off its own ~24.576&nbsp;MHz crystal
+            (divided down to the SPC700's ~1.024&nbsp;MHz). The two aren't in any tidy
+            ratio, so the emulator must interleave them carefully; let them drift and
+            the mailbox handshake from Module 08 breaks, and games hang waiting for an
+            APU that answered a beat too early or too late.
+          </p>
+          <p>
+            Second is the <strong>CPU↔APU sync problem</strong>. Because games poll
+            the mailbox in tight timing loops, an accurate emulator has to switch
+            between emulating the main CPU and the SPC700 the instant either touches a
+            shared port — sometimes cycle by cycle. Get it slightly wrong and you get
+            missing music, stuck notes, or a boot that never completes.
+          </p>
+          <p>
+            On top of timing sit the fiddly details of the DSP itself: the exact
+            512-entry <strong>Gaussian table</strong>, the precise integer maths of the
+            four BRR filters, and edge cases like what a shift value above 12 does or
+            how the very first block behaves. Getting these bit-exact took years of
+            reverse engineering. Much of it crystallised in <strong>blargg's
+            SPC_DSP</strong> core — a compact, accurate C++ implementation that
+            <strong>bsnes</strong> and <strong>snes9x</strong> both reuse, which is why
+            they agree down to the sample. The lab steps an SPC700 driver snippet as it
+            writes a voice's volumes and keys it on — the fetch/execute cycle an
+            emulator runs millions of times a second.
+          </p>
+
+          <div class="lab" id="lab-spc">
+            <div class="lab-head"><span class="dot"></span><span class="title">SPC700 by hand — key on a voice</span><span class="badge">no audio · step</span></div>
+            <div class="lab-body">
+              <div class="spc-grid">
+                <div class="spc-code" data-spc-code></div>
+                <div class="spc-regs" data-spc-regs></div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-spc-step>Step ▸</button>
+                <button class="play-btn" data-spc-run style="background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#120c22">▶ Run</button>
+                <button class="surr-btn" data-spc-reset>Reset</button>
+              </div>
+              <span class="lab-note" data-spc-note></span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>SNES audio accuracy means running two crystals in lock-step (21.477 MHz vs the SMP's ~24.576 MHz → 1.024 MHz).</li>
+              <li>The CPU↔APU mailbox is polled in tight loops, so the emulator must sync the two cores tightly.</li>
+              <li>blargg's SPC_DSP core — reused by bsnes and snes9x — nails the Gaussian table and BRR-decode edge cases.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#drivers"><span class="dir">← Prev</span><span class="ttl">14 · Mixing &amp; music drivers</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">16 · SPC files &amp; try it</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 16 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 16 <span class="part-tag">· Part III</span></span>
+          <h3>SPC files &amp; try it</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn what an SPC file actually contains, how players resume a song from it, and test everything you've learned.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here's the elegant payoff of the two-computer design. Because the whole
+            song lives inside the APU — driver, samples and all — you can capture a
+            track by freezing the APU's entire state. That snapshot is the
+            <strong>SPC file format</strong>, and it's tiny: a full
+            <strong>64&nbsp;KB dump of ARAM</strong>, the <strong>128 bytes of DSP
+            registers</strong>, the SPC700's CPU registers, and a chunk of
+            <strong>ID666</strong> metadata tags (song title, game, composer, length).
+            No audio is stored at all — just the machine, paused mid-song.
+          </p>
+          <p>
+            An SPC player is therefore not really a player of audio; it's a mini SNES
+            with only the sound half. It loads the 64&nbsp;KB into an emulated ARAM,
+            restores the DSP registers and SPC700 state, and simply <strong>lets the
+            frozen driver keep running</strong> from exactly where it was captured. The
+            music resumes because the driver picks up its own sequence data and carries
+            on writing <code>KON</code>s — the same loop from Module 14, thawed. This is
+            why a five-kilobyte file can play minutes of music: you're shipping the
+            program, not the performance.
+          </p>
+          <div class="note">
+            <div class="ico">▸</div>
+            <div>
+              <p>
+                Want to go further? Grab <strong>bsnes</strong> or
+                <strong>snes9x</strong>, load a game you own, and open the audio
+                debugger to watch the eight voices and DSP registers change in real
+                time. Or open an <code>.spc</code> in a player and mute voices one by
+                one — you'll hear the exact eight-voice split from Module 09. Everything
+                in this course is right there on screen.
+              </p>
+            </div>
+          </div>
+
+          <p>
+            One last thing: a quick exam. Six questions, each pointing back at the
+            module that answers it.
+          </p>
+
+          <div class="lab" id="lab-quiz">
+            <div class="lab-head"><span class="dot"></span><span class="title">Final check — six questions</span><span class="badge">quiz · <span data-quiz-score>0 / 6</span></span></div>
+            <div class="lab-body">
+              <div class="quiz" data-quiz></div>
+              <div class="q-verdict" data-quiz-verdict hidden></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can read the signal path from a pressure wave — Module 01 — all the way to 32 kHz stereo.</li>
+              <li>You know the SNES stores sound as BRR, plays it on 8 Gaussian-interpolated voices, and shapes it with ADSR/GAIN and an 8-tap echo FIR.</li>
+              <li>You understand why one little Sony computer, frozen into a 64 KB SPC file, can replay a whole song.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#emulate"><span class="dir">← Prev</span><span class="ttl">15 · Emulating SPC700 + DSP</span></a>
+            <a class="next" href="#waves"><span class="dir">↺ Restart</span><span class="ttl">01 · Sound as waves</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive teardown of Super Nintendo audio. Every sound here is
+          generated on the fly with the Web&nbsp;Audio API to illustrate a concept —
+          the BRR codec, envelopes, interpolation and echo are all real algorithms
+          running live in your browser. This page contains <strong>no game audio</strong>
+          and ships no binary assets. Register names and addresses follow the
+          documented S-DSP map.
+        </p>
+        <p class="src">
+          Source of truth · <code>S-DSP register map $00–$7F</code> ·
+          <code>SPC700 / S-SMP</code> · <code>BRR 9-byte blocks</code> ·
+          <code>blargg SPC_DSP (bsnes / snes9x)</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<!-- ================================================= PLAYER ============== -->
+<div class="player" role="region" aria-label="Sound player">
+  <div class="transport">
+    <button class="pp" id="pp" aria-label="Play">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <div class="meta">
+      <div class="now">Now playing</div>
+      <div class="track" id="now-track">Nothing playing</div>
+    </div>
+  </div>
+  <canvas class="viz" id="player-viz" aria-hidden="true"></canvas>
+  <div class="right">
+    <div class="stat" id="stat-voices">Web&nbsp;Audio · <b>synth</b><br>no game audio</div>
+    <input type="range" class="vol" id="vol" min="0" max="100" value="70" aria-label="Master volume">
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

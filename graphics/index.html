@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super NES Graphics — a course on the S-PPU1/S-PPU2, Mode 7 &amp; emulation</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%237d5cf0%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%276%27 fill=%27none%27 stroke=%27%230c0a13%27 stroke-width=%273%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: 2D graphics fundamentals from scratch, how the Super NES PPU pair draws a frame (tiles, palettes, sprites, Mode 7, colour math, HDMA), and how bsnes emulates it — with live, procedurally-rendered labs so you can see every concept.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Super NES Graphics</h1>
+        <span class="sub">A course · 16 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · 2D graphics from zero</div>
+      <a href="#pixels"><span class="n">01</span><span>Pixels &amp; the framebuffer</span></a>
+      <a href="#palettes"><span class="n">02</span><span>Colour &amp; palettes</span></a>
+      <a href="#tiles"><span class="n">03</span><span>Tiles &amp; bitplanes</span></a>
+      <a href="#tilemaps"><span class="n">04</span><span>Tilemaps &amp; scrolling</span></a>
+      <a href="#sprites"><span class="n">05</span><span>Sprites / OBJ</span></a>
+      <a href="#layers"><span class="n">06</span><span>Layers &amp; priority</span></a>
+      <a href="#raster"><span class="n">07</span><span>Raster timing</span></a>
+
+      <div class="toc-group">Part II · The SNES PPU</div>
+      <a href="#ppu"><span class="n">08</span><span>The two PPUs &amp; pipeline</span></a>
+      <a href="#modes"><span class="n">09</span><span>The background modes</span></a>
+      <a href="#mode7"><span class="n">10</span><span>Mode 7</span></a>
+      <a href="#obj"><span class="n">11</span><span>Sprites on hardware</span></a>
+      <a href="#colormath"><span class="n">12</span><span>Colour math</span></a>
+      <a href="#hdma"><span class="n">13</span><span>HDMA raster tricks</span></a>
+      <a href="#vram"><span class="n">14</span><span>VRAM, CGRAM, OAM</span></a>
+
+      <div class="toc-group">Part III · Emulating in bsnes</div>
+      <a href="#emulate"><span class="n">15</span><span>Per-scanline vs per-dot</span></a>
+      <a href="#try"><span class="n">16</span><span>Accuracy &amp; try it</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-raster" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · the S-PPU1 &amp; S-PPU2</span>
+          <h2>How the <span class="grad">Super NES</span> drew its worlds.</h2>
+          <p class="lede">
+            We start from the very beginning — what a digital picture even
+            <em>is</em> — assuming you know nothing about computer graphics. Once
+            the vocabulary is solid, we follow a frame through the Super
+            Nintendo's two picture-processing chips and out to the electron beam.
+            Sixteen modules, each with <strong>live, procedurally-rendered
+            labs</strong> so you can drag, paint and break every idea, not just
+            read it. No game artwork ships with this page; every pixel is drawn
+            in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#pixels">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#mode7">Skip ahead: Mode 7 ✦</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>2D graphics from zero</h4>
+              <p>Pixels, 15-bit colour, tiles and bitplanes, tilemaps, sprites, layers and the electron beam — the vocabulary of 2D hardware, explained from scratch.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The SNES PPU</h4>
+              <p>The S-PPU1/S-PPU2 pair, the eight background modes, Mode 7's affine floor, 128 sprites, colour math and HDMA raster tricks.</p>
+              <div class="cnt">7 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating in bsnes</h4>
+              <p>Why accuracy means rendering per-dot, what breaks when you don't, and the debug tools that let you see a real PPU thinking.</p>
+              <div class="cnt">2 modules · with tools</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>2D graphics from zero</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            chip yet. It's the toolkit that <em>every</em> tile-based 2D machine
+            is built from, from arcade boards to the Game Boy to the console we
+            meet in Part II. We build the vocabulary one word at a time — pixel,
+            palette, tile, bitplane, tilemap, sprite, layer, scanline — and each
+            idea has a live lab you can poke. If a term is ever used before it's
+            explained, that's a bug. Everything in Parts II and III is just these
+            ideas wired together in silicon.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–07</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>7 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="pixels">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>Pixels &amp; the framebuffer</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, how a picture on a screen becomes a grid of numbers a computer can store and change — and how small that grid was on the SNES.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Lean in close to any display — a phone, or the family CRT the Super
+            Nintendo was plugged into — and the image falls apart into a grid of
+            tiny glowing dots. Each dot is a <strong>pixel</strong> (from
+            &ldquo;picture element&rdquo;), and it can show exactly one colour at
+            a time. Step back and your eye fuses the grid into a smooth image.
+            That's all a digital picture is: a rectangular grid of single-colour
+            dots.
+          </p>
+          <p>
+            The whole grid of colour numbers, held in memory, is the
+            <span class="term" data-tip="The block of memory holding the colour of every pixel of the image being shown or built.">framebuffer</span>.
+            The number of dots across and down is the
+            <strong>resolution</strong>. And here is the first genuinely
+            Super-Nintendo fact: its standard picture is a mere
+            <strong>256&nbsp;×&nbsp;224</strong> pixels. That is tiny — roughly a
+            thirtieth of a modern 1080p frame. The console could also switch to a
+            512-pixel-wide <span class="term" data-tip="A SNES video mode with 512 pixels across (Modes 5 and 6), used for sharper interfaces and some effects.">hi-res</span>
+            width, output 239 tall, or run
+            <span class="term" data-tip="A CRT technique that draws even lines one field and odd lines the next, doubling apparent vertical resolution at the cost of flicker.">interlace</span>
+            to reach 448/478 tall, but the everyday canvas artists worked on was
+            those 256&nbsp;×&nbsp;224 dots. Every trick in this course exists to
+            make that small grid look rich.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A mosaic</span>
+            <p>
+              A mosaic portrait is thousands of small single-colour tiles. Up
+              close: coloured squares. Across the room: a face. A
+              <span class="term" data-tip="One dot of a digital image; it shows a single colour chosen from the palette.">pixel</span>
+              grid is a mosaic your machine repaints sixty times a second — and
+              the framebuffer is the numbered order sheet saying which tile goes
+              where. On the SNES that sheet was small enough to matter: every
+              pixel had to earn its place.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="A small pixel grid, one pixel magnified, and the 256 by 224 SNES frame at scale">
+              <rect x="70" y="30" width="240" height="120" fill="#3a68d8"/>
+              <rect x="70" y="150" width="240" height="30" fill="#7fb0ef"/>
+              <rect x="220" y="60" width="60" height="60" fill="#ffcf3b"/>
+              <rect x="70" y="180" width="240" height="90" fill="#3f9e52"/>
+              <g class="d-grid">
+                <line x1="100" y1="30" x2="100" y2="270"/><line x1="130" y1="30" x2="130" y2="270"/>
+                <line x1="160" y1="30" x2="160" y2="270"/><line x1="190" y1="30" x2="190" y2="270"/>
+                <line x1="220" y1="30" x2="220" y2="270"/><line x1="250" y1="30" x2="250" y2="270"/>
+                <line x1="280" y1="30" x2="280" y2="270"/>
+                <line x1="70" y1="60" x2="310" y2="60"/><line x1="70" y1="90" x2="310" y2="90"/>
+                <line x1="70" y1="120" x2="310" y2="120"/><line x1="70" y1="150" x2="310" y2="150"/>
+                <line x1="70" y1="180" x2="310" y2="180"/><line x1="70" y1="210" x2="310" y2="210"/>
+                <line x1="70" y1="240" x2="310" y2="240"/>
+              </g>
+              <rect x="70" y="30" width="240" height="240" fill="none" class="d-axis"/>
+              <rect x="220" y="60" width="30" height="30" fill="none" stroke="#45e4d1" stroke-width="2.5"/>
+              <line x1="250" y1="60" x2="470" y2="52" class="d-stem"/>
+              <line x1="250" y1="90" x2="470" y2="252" class="d-stem"/>
+              <rect x="470" y="52" width="200" height="200" fill="#ffcf3b" rx="8"/>
+              <rect x="470" y="52" width="200" height="200" fill="none" class="d-axis" rx="8"/>
+              <rect x="716" y="86" width="150" height="42" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="732" y="112" class="d-val d-violet">index → palette</text>
+              <rect x="716" y="150" width="150" height="42" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="732" y="176" class="d-val d-cyan">256 × 224</text>
+              <text x="70" y="20" class="d-tag d-cyan">an 8 × 8 patch of the frame</text>
+              <text x="470" y="40" class="d-tag d-magenta">one pixel, magnified</text>
+              <text x="716" y="76" class="d-sub">…is one small number</text>
+              <text x="716" y="212" class="d-sub">the whole SNES frame</text>
+              <text x="70" y="292" class="d-sub">the everyday SNES canvas is only 256 × 224 = 57,344 pixels</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Pictures as numbers.</strong> An image is a grid of pixels. On the SNES a pixel is not stored as red/green/blue directly — it's stored as a small <em>index</em> that looks up a colour in a palette (Module 02). Change the numbers in the framebuffer and dots on screen change.</figcaption>
+          </figure>
+
+          <p>
+            Play with the idea below. Pick a colour, drag across the grid, and
+            watch a picture become a list of numbers. Shrink the grid and every
+            dot gets chunkier; the byte count in the readout is the size of this
+            little framebuffer. A grid-of-pixels image like this is called a
+            <span class="term" data-tip="An image stored as a grid of pixels (as opposed to shapes or curves). The SNES PPU's whole job is to produce one, line by line.">raster</span>
+            image — remember the word, because Module 07 is all about how the
+            beam <em>rasterises</em> one line at a time.
+          </p>
+
+          <div class="lab" id="lab-pixels">
+            <div class="lab-head"><span class="dot"></span><span class="title">Pixel lab — paint a tiny framebuffer</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx paint" aria-label="A paintable pixel grid"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Grid — <span class="val" data-size-val>16 × 16</span></label>
+                  <input type="range" min="8" max="32" value="16" step="8" data-size aria-label="Grid resolution">
+                </div>
+                <div class="ctrl" style="flex:1 1 240px">
+                  <label>Palette — click to pick a colour</label>
+                  <div class="pal-grid small" data-pix-pal role="group" aria-label="Painter palette"></div>
+                </div>
+                <div class="ctrl">
+                  <label>&nbsp;</label>
+                  <button class="btn" data-pix-clear>Clear</button>
+                </div>
+              </div>
+              <div class="lab-readout" data-pix-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A digital image is a grid of pixels; each pixel shows one colour.</li>
+              <li>The framebuffer is the memory holding those numbers — change it and the screen changes.</li>
+              <li>The SNES standard resolution is a small 256 × 224 (also 512-wide hi-res, 239 tall, and interlaced 448/478).</li>
+              <li>On the SNES a pixel is stored as an <em>index</em>, not raw RGB — the next module explains why.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#palettes"><span class="dir">Next →</span><span class="ttl">02 · Colour &amp; palettes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="palettes">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Colour &amp; palettes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See why the SNES stores colours in a lookup table, how one colour is packed into 15 bits of BGR, and how many colours the machine can show.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Storing three full bytes of red/green/blue for every one of 57,344
+            pixels would have been ruinously expensive in 1990. So the SNES —
+            like almost every machine of its era — uses
+            <span class="term" data-tip="A scheme where each pixel stores a small number that indexes into a table of actual colours, rather than storing the colour directly.">indexed colour</span>.
+            Each pixel holds a small <em>index</em> (a 4-bit number 0–15 is
+            typical), and a separate table turns that index into a real colour.
+            That table lives in a dedicated 512-byte memory called
+            <span class="term" data-tip="Colour RAM: the SNES palette memory. 256 entries of 15-bit BGR colour = 512 bytes total.">CGRAM</span>,
+            and it holds <strong>256 entries</strong>.
+          </p>
+          <p>
+            Each CGRAM entry is a <strong>15-bit BGR</strong> value: five bits of
+            blue, five of green, five of red, packed into one 16-bit word (the
+            top bit is unused). Five bits per channel means 32 shades each, so
+            the SNES's total palette — the set of colours it can <em>choose</em>
+            from — is 32&nbsp;×&nbsp;32&nbsp;×&nbsp;32&nbsp;=&nbsp;<strong>32,768
+            colours</strong>. It can display up to 256 of them at once (before
+            the colour-math trickery of Module 12). Note the channel order:
+            hardware people write it <em>BGR</em> because blue occupies the high
+            bits — a colour word looks like <code>0bbbbbgggggrrrrr</code>.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Paint-by-numbers</span>
+            <p>
+              A paint-by-numbers kit gives you a canvas full of little numbered
+              regions and a legend: &ldquo;3 = sky blue, 7 = grass green.&rdquo;
+              The canvas never stores paint — just numbers. Swap the legend and
+              the whole picture recolours without touching the canvas. That legend
+              is CGRAM, and swapping it is exactly how SNES games flash, fade to
+              white, or cycle waterfalls — change the palette, not the pixels.
+            </p>
+          </div>
+
+          <p>
+            The lab below is a colour mixer over one 16-entry sub-palette. Drag
+            the R/G/B sliders (each 0–31) to build a colour and read its 15-bit
+            word live; click any swatch to select and edit that entry. This is,
+            almost exactly, what a game's palette editor showed an artist in 1991.
+          </p>
+
+          <div class="lab" id="lab-palette">
+            <div class="lab-head"><span class="dot"></span><span class="title">Palette lab — mix a 15-bit BGR colour</span><span class="badge">Live</span></div>
+            <div class="lab-body">
+              <div class="swatch-row">
+                <div class="col">
+                  <span class="cap">Selected colour</span>
+                  <div class="swatch-lg" data-pal-sw></div>
+                </div>
+                <div class="col" style="flex:2 1 260px">
+                  <span class="cap">Sub-palette · click to select an entry</span>
+                  <div class="pal-grid" data-pal-grid role="group" aria-label="Palette entries"></div>
+                </div>
+              </div>
+              <div class="controls">
+                <div class="ctrl"><label>Red — <span class="val" data-r-val>0</span> / 31</label><input type="range" min="0" max="31" value="0" data-r aria-label="Red 0-31"></div>
+                <div class="ctrl"><label>Green — <span class="val" data-g-val>0</span> / 31</label><input type="range" min="0" max="31" value="0" data-g aria-label="Green 0-31"></div>
+                <div class="ctrl"><label>Blue — <span class="val" data-b-val>0</span> / 31</label><input type="range" min="0" max="31" value="0" data-b aria-label="Blue 0-31"></div>
+              </div>
+              <div class="lab-readout" data-pal-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Pixels store an index; CGRAM (512 bytes, 256 entries) turns each index into a colour.</li>
+              <li>Each entry is 15-bit BGR — 5 bits per channel — so the master palette is 32,768 colours.</li>
+              <li>Up to 256 colours on screen at once from that palette (more with colour math).</li>
+              <li>Recolouring the whole scene = rewriting CGRAM, not the pixels — the source of countless SNES effects.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#pixels"><span class="dir">← Prev</span><span class="ttl">01 · Pixels &amp; the framebuffer</span></a>
+            <a class="next" href="#tiles"><span class="dir">Next →</span><span class="ttl">03 · Tiles &amp; bitplanes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="tiles">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Tiles &amp; bitplanes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn why the SNES draws everything from 8×8 tiles, and how a tile's pixels are stored as stacked 1-bit bitplanes.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SNES almost never draws individual pixels. It draws
+            <span class="term" data-tip="An 8×8-pixel image, the atomic building block of SNES backgrounds and sprites.">tiles</span>:
+            fixed 8&nbsp;×&nbsp;8 blocks of pixels, stored once and reused all over
+            the screen. A brick wall is one brick tile repeated; a font is a tile
+            per glyph. Reuse is the whole point — it slashes memory and lets the
+            hardware fetch a known-size block on a predictable schedule.
+          </p>
+          <p>
+            Now, how is one tile's colour data laid out? Not as &ldquo;index,
+            index, index&rdquo; pixel by pixel. Instead the SNES uses
+            <span class="term" data-tip="Storing an image as separate 1-bit layers, one per bit of the colour index; the layers stack to form each pixel's number.">planar bitplanes</span>.
+            Think of a pixel's index in binary. A 4-bit index has bits 0,1,2,3.
+            The hardware stores <em>all the bit-0s of every pixel</em> as one
+            8&nbsp;×&nbsp;8 one-bit image (plane 0), all the bit-1s as another
+            (plane 1), and so on. Stack the planes and read the same pixel out of
+            each: those bits, combined, are that pixel's palette index. The number
+            of planes sets the <span class="term" data-tip="Bits per pixel — how many bitplanes a tile has. 2bpp = 4 colours, 4bpp = 16, 8bpp = 256.">bit depth</span>:
+            2bpp (2 planes → 4 colours), 4bpp (4 planes → 16 colours), or 8bpp
+            (8 planes → 256 colours).
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Transparent overlays</span>
+            <p>
+              Imagine four sheets of clear acetate, each stamped with a pattern of
+              dots. Lay them on top of one another over a lightbox: where sheets 1
+              and 3 both have a dot, you read the binary number 0101 = 5, and pixel
+              5's colour appears. Toggle one sheet and every pixel's number shifts.
+              That's a bitplane tile — and it's exactly what the lab lets you do.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="Four bitplanes stacking to form a 4-bit palette index">
+              <text x="24" y="30" class="d-tag d-cyan">four 1-bit planes stack into one 4-bit index</text>
+              <g>
+                <rect x="30" y="60" width="120" height="120" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <text x="90" y="205" text-anchor="middle" class="d-sub">plane 0 (bit 0)</text>
+                <rect x="170" y="60" width="120" height="120" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <text x="230" y="205" text-anchor="middle" class="d-sub">plane 1 (bit 1)</text>
+                <rect x="310" y="60" width="120" height="120" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <text x="370" y="205" text-anchor="middle" class="d-sub">plane 2 (bit 2)</text>
+                <rect x="450" y="60" width="120" height="120" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+                <text x="510" y="205" text-anchor="middle" class="d-sub">plane 3 (bit 3)</text>
+              </g>
+              <text x="600" y="126" class="d-label" style="font-size:26px" fill="#877f9e">→</text>
+              <rect x="650" y="60" width="120" height="120" rx="8" class="d-fill-panel2 d-violet-s" stroke-width="1.6"/>
+              <text x="710" y="205" text-anchor="middle" class="d-sub d-violet">composited tile</text>
+              <text x="710" y="128" text-anchor="middle" class="d-num" style="font-size:15px">index 0–15</text>
+              <text x="800" y="100" class="d-sub">4 planes</text>
+              <text x="800" y="120" class="d-sub">= 4 bits</text>
+              <text x="800" y="140" class="d-sub">= 16 colours</text>
+              <text x="800" y="160" class="d-sub">= 32 bytes</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Planar storage.</strong> A 4bpp tile is four 8×8 one-bit planes. Read one pixel out of all four planes, combine the bits, and you have its 0–15 palette index. In SNES memory the planes are interleaved a specific way: planes 0/1 by row first (16 bytes), then planes 2/3 (16 bytes) — 32 bytes per 4bpp tile.</figcaption>
+          </figure>
+
+          <p>
+            In the lab, paint palette indices onto the 8&nbsp;×&nbsp;8 tile, then
+            switch individual planes off. Watch the composited colours jump as a
+            bit is forced to zero everywhere — and watch the raw 32-byte layout
+            update underneath. This is the exact byte order a real SNES tile
+            occupies in VRAM.
+          </p>
+
+          <div class="lab" id="lab-tiles">
+            <div class="lab-head"><span class="dot"></span><span class="title">Bitplane lab — build a 4bpp tile</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx short" data-bp-comp aria-label="Composited 8x8 tile; click to paint"></canvas>
+              <canvas class="gfx short" data-bp-planes aria-label="The four bitplanes shown separately"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Brush index — <span class="val" data-bp-brush-val>6</span> / 15</label>
+                  <input type="range" min="0" max="15" value="6" data-bp-brush aria-label="Brush palette index">
+                </div>
+                <div class="ctrl">
+                  <label>Planes (toggle on/off)</label>
+                  <div class="chan-btns" data-bp-toggles role="group" aria-label="Plane toggles">
+                    <button class="on" data-plane="0">P0</button>
+                    <button class="on" data-plane="1">P1</button>
+                    <button class="on" data-plane="2">P2</button>
+                    <button class="on" data-plane="3">P3</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-bp-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Everything is built from reusable 8×8 tiles — huge memory savings.</li>
+              <li>Tiles are stored as planar bitplanes: one 1-bit layer per index bit, stacked.</li>
+              <li>Bit depth = number of planes: 2bpp/4bpp/8bpp → 4/16/256 colours.</li>
+              <li>A 4bpp tile is 32 bytes, with planes 0/1 interleaved by row, then 2/3.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#palettes"><span class="dir">← Prev</span><span class="ttl">02 · Colour &amp; palettes</span></a>
+            <a class="next" href="#tilemaps"><span class="dir">Next →</span><span class="ttl">04 · Tilemaps &amp; scrolling</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="tilemaps">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Tilemaps &amp; scrolling</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Assemble a full background from a grid of tile references, and scroll it smoothly with a single pair of registers.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A tile is 8&nbsp;×&nbsp;8; the screen is far bigger. The bridge is the
+            <span class="term" data-tip="A grid of entries, one per on-screen tile cell, each naming which tile to draw plus its palette, priority and flip flags.">tilemap</span>:
+            a grid of small entries, one per tile-sized cell of the background. A
+            SNES tilemap screen is <strong>32&nbsp;×&nbsp;32</strong> entries
+            (256&nbsp;×&nbsp;256 pixels), and layers can stitch several of these
+            together for scrolling room. Each entry is a 16-bit word that packs
+            more than just a tile number: a <strong>tile index</strong>, a
+            <strong>palette number</strong> (which of the sub-palettes to use), a
+            <strong>priority bit</strong>, and <strong>horizontal &amp; vertical
+            flip</strong> flags — so one tile can face four ways and wear
+            different colours across the map for free.
+          </p>
+          <p>
+            Scrolling is where tiles earn their keep. To move the whole
+            background, the SNES doesn't shuffle pixels — it just changes two
+            numbers: the background's horizontal and vertical scroll offsets
+            (<span class="term" data-tip="The per-layer horizontal/vertical scroll offset registers, e.g. $210D-$2114, that shift where a background is sampled.">BGnHOFS / BGnVOFS</span>).
+            The PPU adds those offsets when it decides which tile and pixel to
+            fetch, and the map <strong>wraps around</strong> at its edge, so a
+            small map can scroll forever. Increment the offset each frame and the
+            world glides past.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A window over wallpaper</span>
+            <p>
+              Picture a long roll of patterned wallpaper behind a wall with a
+              small window cut in it. You never move the paper's pattern pixel by
+              pixel — you just slide the whole roll left or right behind the
+              window, and different parts show through. The scroll registers slide
+              the roll; the window is your 256&nbsp;×&nbsp;224 screen.
+            </p>
+          </div>
+
+          <p>
+            Below, a 32&nbsp;×&nbsp;32 map built from four procedural tiles scrolls
+            behind a viewport. Drag the scroll sliders or hit auto-scroll and watch
+            the wrap-around: the map is only 256 pixels wide, yet it never runs out.
+          </p>
+
+          <div class="lab" id="lab-tilemap">
+            <div class="lab-head"><span class="dot"></span><span class="title">Tilemap lab — scroll a background</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A scrolling tilemap viewport"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>BGHOFS (scroll X) — <span class="val" data-tm-x-val>0</span></label><input type="range" min="0" max="255" value="0" data-tm-x aria-label="Horizontal scroll"></div>
+                <div class="ctrl"><label>BGVOFS (scroll Y) — <span class="val" data-tm-y-val>0</span></label><input type="range" min="0" max="255" value="0" data-tm-y aria-label="Vertical scroll"></div>
+                <div class="ctrl"><label>&nbsp;</label><button class="play-btn" data-tm-play></button></div>
+              </div>
+              <div class="lab-readout" data-tm-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A tilemap is a 32×32 grid of entries; each entry names a tile plus palette, priority and H/V flip.</li>
+              <li>One tile can be reused in four orientations and several palettes across the map.</li>
+              <li>Scrolling is just two registers per layer — the PPU offsets its fetches; nothing moves in memory.</li>
+              <li>Maps wrap around, so a 256-pixel map scrolls endlessly.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#tiles"><span class="dir">← Prev</span><span class="ttl">03 · Tiles &amp; bitplanes</span></a>
+            <a class="next" href="#sprites"><span class="dir">Next →</span><span class="ttl">05 · Sprites / OBJ</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="sprites">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>Sprites / OBJ</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the moving objects — sprites — that float freely over the fixed backgrounds, and the tiny table that positions them.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Backgrounds are locked to their tile grid. But Mario, a fireball, a
+            coin — these need to move to any pixel, independent of the grid. Those
+            are <span class="term" data-tip="A freely-positioned movable object made of tiles, drawn over the backgrounds. The SNES calls them OBJ.">sprites</span>,
+            which the SNES calls <strong>OBJ</strong>. A sprite is still made of
+            tiles, but it isn't pinned to a tilemap cell: it carries its own
+            <code>(x,&nbsp;y)</code> position and is composited on top of the
+            backgrounds wherever you place it.
+          </p>
+          <p>
+            Everything the PPU needs to draw the sprites lives in a small dedicated
+            memory called <span class="term" data-tip="Object Attribute Memory: the 544-byte table describing every sprite's position, tile, palette, priority and flip.">OAM</span>.
+            Per sprite it stores the X and Y position, the starting tile number, a
+            palette selection, a priority (which lets a sprite sit in front of or
+            behind particular backgrounds), and horizontal/vertical flip flags —
+            the same attribute vocabulary as a tilemap entry, but now free-floating.
+            Change a sprite's X in OAM and it slides across the screen without a
+            single pixel being redrawn by hand.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Felt figures on a storyboard</span>
+            <p>
+              Old TV animation used a painted background and separate felt or cel
+              figures laid on top, nudged frame by frame. The background never
+              changed; only the little figures moved. Sprites are those figures,
+              and OAM is the director's list of where each one sits this frame.
+            </p>
+          </div>
+
+          <p>
+            In the lab, sprites bounce over a tiled background. Add more with the
+            slider, and flip the priority so the OBJ layer ducks behind the ground
+            — a trick games use constantly for grass, doorways and water.
+          </p>
+
+          <div class="lab" id="lab-sprites">
+            <div class="lab-head"><span class="dot"></span><span class="title">Sprite lab — composite OBJs over a background</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="Sprites moving over a background"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>Sprites — <span class="val" data-sp-count-val>6</span></label><input type="range" min="1" max="24" value="6" data-sp-count aria-label="Number of sprites"></div>
+                <div class="ctrl">
+                  <label>OBJ priority</label>
+                  <div class="seg-btns" data-sp-pri role="group" aria-label="Sprite priority">
+                    <button class="on" data-pri="front">in front</button>
+                    <button data-pri="back">behind ground</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-sp-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Sprites (OBJ) are tile-built objects placed at any pixel, over the backgrounds.</li>
+              <li>OAM (544 bytes) holds each sprite's position, tile, palette, priority and flip.</li>
+              <li>Moving a sprite = editing a couple of OAM bytes; no pixels are pushed around.</li>
+              <li>Priority lets sprites weave in front of or behind chosen background layers.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#tilemaps"><span class="dir">← Prev</span><span class="ttl">04 · Tilemaps &amp; scrolling</span></a>
+            <a class="next" href="#layers"><span class="dir">Next →</span><span class="ttl">06 · Layers &amp; priority</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="layers">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part I</span></span>
+          <h3>Layers &amp; priority</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Stack multiple backgrounds and the sprite layer into one image, and understand transparency and priority ordering.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A SNES scene is several <strong>background layers</strong> plus the
+            sprite layer, composited front-to-back into the final picture. Depending
+            on the mode (Module 09) there can be up to four backgrounds — BG1, BG2,
+            BG3, BG4 — and each can scroll independently. Parallax skies, foreground
+            bushes, a HUD that stays put: all just separate layers moving at
+            different speeds.
+          </p>
+          <p>
+            Two rules turn a stack of layers into a picture. First,
+            <strong>transparency</strong>: in every layer, palette
+            <span class="term" data-tip="Colour index 0 in a layer is treated as transparent — the layers behind it show through those pixels.">colour&nbsp;0 is transparent</span>,
+            so lower layers show through wherever an upper layer's pixel is index
+            0. Second, <span class="term" data-tip="The rules deciding which layer's pixel wins where several overlap — combining a fixed layer order with per-tile and per-sprite priority bits.">priority</span>:
+            beyond the base layer order, individual tiles and sprites carry priority
+            bits that can promote them above layers that would otherwise cover them.
+            That's how a sprite can pass behind a pillar (low priority) and then in
+            front of the floor (high priority) in the same scene.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A pop-up book</span>
+            <p>
+              A pop-up book is cut sheets standing at different depths: sky at the
+              back, hills in the middle, characters up front, with holes where you
+              see through to the layer behind. The SNES builds each frame the same
+              way — stacked sheets with transparent gaps — except it can re-shuffle
+              which sheet stands in front, tile by tile.
+            </p>
+          </div>
+
+          <p>
+            Toggle the four layers below and watch the composite rebuild. Turn off
+            BG1 and the ground vanishes to reveal the hills behind; turn off the OBJ
+            layer and the hero disappears. Colour 0 in each layer is the see-through
+            ink that makes it all fit together.
+          </p>
+
+          <div class="lab" id="lab-layers">
+            <div class="lab-head"><span class="dot"></span><span class="title">Layer lab — toggle the stack</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A composited multi-layer scene"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Layers (back → front)</label>
+                  <div class="chan-btns" data-ly-toggles role="group" aria-label="Layer toggles">
+                    <button class="on" data-layer="bg3">BG3</button>
+                    <button class="on" data-layer="bg2">BG2</button>
+                    <button class="on" data-layer="bg1">BG1</button>
+                    <button class="on" data-layer="obj">OBJ</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-ly-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A frame is several background layers plus sprites, composited front-to-back.</li>
+              <li>Colour index 0 in a layer is transparent — lower layers show through.</li>
+              <li>Priority (layer order plus per-tile / per-sprite bits) decides who wins where they overlap.</li>
+              <li>Independent per-layer scrolling gives parallax and stationary HUDs.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sprites"><span class="dir">← Prev</span><span class="ttl">05 · Sprites / OBJ</span></a>
+            <a class="next" href="#raster"><span class="dir">Next →</span><span class="ttl">07 · Raster timing</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="raster">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part I</span></span>
+          <h3>Raster timing</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Follow the electron beam across a frame, understand H-blank and V-blank, and see why VRAM is only safely written during blanking.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SNES doesn't compute a whole frame and then show it. It feeds a CRT,
+            where a single <strong>electron beam</strong> sweeps left-to-right along
+            one <span class="term" data-tip="One horizontal line of the picture, drawn in a single left-to-right sweep of the electron beam.">scanline</span>,
+            then snaps back and drops to the next line, top to bottom. The PPU
+            produces the picture <em>the same way</em> — one scanline at a time, in
+            lockstep with the beam. A NTSC frame is about 262 scanlines of which 224
+            are visible; the machine repeats it roughly 60 times a second.
+          </p>
+          <p>
+            Between the useful parts are two pauses. After each visible line the beam
+            races back to the left — the <span class="term" data-tip="The brief gap after each scanline while the beam returns to the left edge; a safe moment for small PPU register writes.">horizontal blank (H-blank)</span>.
+            After the last visible line the beam returns to the top — the longer
+            <span class="term" data-tip="The pause after the last visible scanline while the beam returns to the top; the main window for bulk VRAM/CGRAM/OAM updates.">vertical blank (V-blank)</span>.
+            These gaps matter enormously, because <strong>the PPU is reading VRAM the
+            entire time it's drawing</strong>. If the CPU writes VRAM mid-line, it
+            fights the PPU for the same memory and you get garbage. So the rule, burned
+            into every SNES programmer's brain, is: <strong>touch VRAM, CGRAM and OAM
+            only during blanking</strong> — mostly the roomy V-blank.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Repainting a stage between scenes</span>
+            <p>
+              A theatre crew can't repaint the set while the actors are performing
+              under the lights — they wait for the blackout between scenes. V-blank
+              is that blackout: the one moment the &ldquo;stage&rdquo; (VRAM) is dark
+              and the crew (the CPU) can rush in and change things before the lights
+              come back up for the next frame.
+            </p>
+          </div>
+
+          <p>
+            The lab runs a beam across a full raster. The shaded right margin and
+            bottom band are H-blank and V-blank; the readout tells you, at every
+            moment, whether it's safe to write video memory. Slow it down to watch a
+            single line being painted dot by dot.
+          </p>
+
+          <div class="lab" id="lab-beam">
+            <div class="lab-head"><span class="dot"></span><span class="title">Beam lab — watch a frame get drawn</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall" aria-label="An electron beam sweeping a raster"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>Beam speed — <span class="val" data-beam-speed-val>1.0×</span></label><input type="range" min="0.15" max="3" value="1" step="0.05" data-beam-speed aria-label="Beam speed"></div>
+                <div class="ctrl"><label>&nbsp;</label><button class="play-btn" data-beam-play></button></div>
+              </div>
+              <div class="legend">
+                <span class="chip"><i style="background:rgba(168,132,255,.4)"></i> H-blank / V-blank (safe to write)</span>
+                <span class="chip"><i style="background:#45e4d1"></i> beam position</span>
+              </div>
+              <div class="lab-readout" data-beam-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The picture is produced scanline by scanline, in step with a CRT's electron beam.</li>
+              <li>H-blank follows each line; V-blank follows the frame — the gaps between drawing.</li>
+              <li>The PPU reads VRAM while drawing, so the CPU must write VRAM/CGRAM/OAM only during blanking.</li>
+              <li>V-blank is the main window for bulk video-memory updates — and it's short.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#layers"><span class="dir">← Prev</span><span class="ttl">06 · Layers &amp; priority</span></a>
+            <a class="next" href="#ppu"><span class="dir">Next →</span><span class="ttl">08 · The two PPUs &amp; pipeline</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The SNES PPU</h3>
+          <p>
+            Now we open the box. The Super Nintendo's graphics are produced by two
+            chips working as one — the S-PPU1 and S-PPU2 — reading from three small
+            memories on a strict per-scanline schedule. In this part we map the
+            pipeline, walk the eight background modes, unpack Mode 7's rotating
+            floor, hit the real sprite limits, blend the main and sub screens with
+            colour math, and abuse HDMA to change registers mid-frame. Everything
+            from Part I is about to become a register.
+          </p>
+          <div class="part-meta"><span>Modules <b>08–14</b></span><span>Focus <b>Real hardware</b></span><span>Labs <b>7 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="ppu">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>The two PPUs &amp; the pipeline</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the S-PPU1/S-PPU2 pair, the three memories they own, and the per-scanline pipeline that turns tiles into a line of colour.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SNES splits picture generation across two chips. The
+            <span class="term" data-tip="The first Super NES Picture Processing Unit: handles VRAM addressing, sprite (OBJ) evaluation and OAM.">S-PPU1</span>
+            handles VRAM addressing and the sprites — evaluating OAM, deciding which
+            OBJ appear on each scanline. The
+            <span class="term" data-tip="The second Super NES Picture Processing Unit: composes the backgrounds, applies colour math and windows, and produces the final pixel.">S-PPU2</span>
+            composes the backgrounds, runs colour math and windowing, and emits the
+            final pixel. They pass data between them every line; to a programmer they
+            behave like one unit addressed through a bank of registers at
+            <code>$2100–$213F</code>.
+          </p>
+          <p>
+            Between them the pair owns three dedicated memories, and their sizes are
+            worth memorising because every later module bumps into them:
+            <strong>VRAM 64&nbsp;KB</strong> (tiles and tilemaps),
+            <strong>CGRAM 512&nbsp;B</strong> (the 256-colour palette), and
+            <strong>OAM 544&nbsp;B</strong> (the 128 sprites' attributes). None is
+            large. Fitting a game's graphics into 64&nbsp;KB of VRAM, streamed in
+            during those short blanking windows, was the central art of SNES
+            development.
+          </p>
+
+          <div class="specs">
+            <div class="spec"><div class="k">VRAM</div><div class="v">64 <small>KB</small></div><div class="d">tiles + tilemaps</div></div>
+            <div class="spec"><div class="k">CGRAM</div><div class="v">512 <small>B</small></div><div class="d">256 × 15-bit colour</div></div>
+            <div class="spec"><div class="k">OAM</div><div class="v">544 <small>B</small></div><div class="d">128 sprites</div></div>
+            <div class="spec"><div class="k">Registers</div><div class="v gfx-mhz">$2100</div><div class="d">…through $213F</div></div>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="The SNES per-scanline PPU pipeline from memories to final pixel">
+              <defs><marker id="mp" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <text x="24" y="30" class="d-tag d-cyan">one scanline, left to right through the pipeline</text>
+              <!-- memories -->
+              <rect x="20" y="54" width="110" height="40" rx="7" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="75" y="79" text-anchor="middle" class="d-tag">VRAM</text>
+              <rect x="20" y="104" width="110" height="40" rx="7" class="d-fill-panel d-violet-s" stroke-width="1.4"/>
+              <text x="75" y="129" text-anchor="middle" class="d-tag">OAM</text>
+              <rect x="20" y="154" width="110" height="40" rx="7" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+              <text x="75" y="179" text-anchor="middle" class="d-tag">CGRAM</text>
+              <!-- S-PPU1 -->
+              <line x1="130" y1="124" x2="160" y2="124" class="d-axis" stroke-width="1.8" marker-end="url(#mp)"/>
+              <rect x="162" y="74" width="150" height="100" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="237" y="112" text-anchor="middle" class="d-label" style="font-size:14px">S-PPU1</text>
+              <text x="237" y="134" text-anchor="middle" class="d-sub">VRAM addr · sprites</text>
+              <text x="237" y="150" text-anchor="middle" class="d-sub">OAM eval</text>
+              <!-- S-PPU2 -->
+              <line x1="312" y1="124" x2="342" y2="124" class="d-axis" stroke-width="1.8" marker-end="url(#mp)"/>
+              <rect x="344" y="74" width="160" height="100" rx="9" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="424" y="108" text-anchor="middle" class="d-label" style="font-size:14px">S-PPU2</text>
+              <text x="424" y="130" text-anchor="middle" class="d-sub">BG compose</text>
+              <text x="424" y="146" text-anchor="middle" class="d-sub">colour math · windows</text>
+              <!-- output -->
+              <line x1="504" y1="124" x2="534" y2="124" class="d-axis" stroke-width="1.8" marker-end="url(#mp)"/>
+              <rect x="536" y="90" width="150" height="68" rx="9" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="611" y="120" text-anchor="middle" class="d-label" style="font-size:13px">final pixel</text>
+              <text x="611" y="138" text-anchor="middle" class="d-sub">→ beam</text>
+              <line x1="686" y1="124" x2="716" y2="124" class="d-axis" stroke-width="1.8" marker-end="url(#mp)"/>
+              <rect x="718" y="90" width="160" height="68" rx="9" class="d-fill-ground d-stroke-line" stroke-width="1.4"/>
+              <text x="798" y="120" text-anchor="middle" class="d-tag">CRT scanline</text>
+              <text x="798" y="138" text-anchor="middle" class="d-sub">256 × 224</text>
+              <text x="20" y="222" class="d-sub">the pair reads the three memories and emits one pixel per dot, 256 dots per visible line, 224 lines per frame</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two chips, one pipeline.</strong> S-PPU1 addresses VRAM and evaluates sprites from OAM; S-PPU2 composes the backgrounds, applies colour math and windows using CGRAM, and hands a finished pixel to the beam — dot by dot, line by line.</figcaption>
+          </figure>
+
+          <div class="note hw">
+            <div class="ico">✦</div>
+            <div>
+              <p>Because the pipeline runs per dot with no frame buffer of finished pixels to fall back on, everything that changes the picture must be timed against the beam. That single fact powers Modules 10, 12 and 13 — and makes accurate emulation (Part III) genuinely hard.</p>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Two chips: S-PPU1 (VRAM addressing, sprites/OAM) and S-PPU2 (backgrounds, colour math, output).</li>
+              <li>Three small memories: VRAM 64 KB, CGRAM 512 B, OAM 544 B.</li>
+              <li>Programmed through registers $2100–$213F; they behave as one unit.</li>
+              <li>The pipeline emits one pixel per dot with no finished-frame buffer — timing is everything.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#raster"><span class="dir">← Prev</span><span class="ttl">07 · Raster timing</span></a>
+            <a class="next" href="#modes"><span class="dir">Next →</span><span class="ttl">09 · The background modes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="modes">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The background modes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn the eight background modes (0–7) and the trade they all make: more layers, or richer colour, but never both.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The S-PPU2 offers eight <span class="term" data-tip="A PPU-wide setting (register $2105) choosing how many background layers exist and their colour depths.">background modes</span>,
+            numbered 0–7, chosen with register <code>$2105</code>. A mode decides how
+            many BG layers you get and how deep each one's colour is. There is no free
+            lunch: bits spent on more colours are bits not spent on more layers.
+          </p>
+          <p>
+            <strong>Mode 0</strong> gives the most layers — four BGs, but each only
+            2bpp (4 colours). <strong>Mode 1</strong> is the workhorse the vast
+            majority of games use: BG1 and BG2 at 4bpp (16 colours) plus a 2bpp BG3,
+            a great balance of colour and layer count. <strong>Mode 3</strong> trades
+            layers for a single 8bpp (256-colour) BG1. <strong>Modes 5 and 6</strong>
+            switch to 512-pixel hi-res. Modes 2, 4 and 6 add
+            <span class="term" data-tip="A feature of Modes 2/4/6 where a helper layer supplies per-column scroll offsets, letting parts of a background scroll independently — used for wavy, warping effects.">offset-per-tile</span>,
+            letting columns scroll independently. And <strong>Mode 7</strong> is a
+            special case entirely — one layer you can rotate and scale — so it gets
+            its own module next.
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Mode</th><th>Layers</th><th>Depths</th><th>Notable for</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill">0</span></td><td>BG1–4</td><td>2·2·2·2 bpp</td><td>Most layers, 4 colours each</td></tr>
+                <tr><td><span class="pill axwii">1</span></td><td>BG1–3</td><td>4·4·2 bpp</td><td>The workhorse — most games</td></tr>
+                <tr><td><span class="pill">2</span></td><td>BG1–2</td><td>4·4 bpp</td><td>Offset-per-tile</td></tr>
+                <tr><td><span class="pill hb">3</span></td><td>BG1–2</td><td>8·4 bpp</td><td>256-colour BG1</td></tr>
+                <tr><td><span class="pill">4</span></td><td>BG1–2</td><td>8·2 bpp</td><td>256-colour + offset-per-tile</td></tr>
+                <tr><td><span class="pill ax">5</span></td><td>BG1–2</td><td>4·2 bpp</td><td>512-wide hi-res</td></tr>
+                <tr><td><span class="pill">6</span></td><td>BG1</td><td>4 bpp</td><td>Hi-res + offset-per-tile</td></tr>
+                <tr><td><span class="pill zelda">7</span></td><td>BG1</td><td>8 bpp</td><td>Rotation / scaling (Module 10)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A fixed art budget</span>
+            <p>
+              Imagine a fixed jar of coins to split between &ldquo;number of
+              layers&rdquo; and &ldquo;colours per layer.&rdquo; Mode 0 buys four thin
+              layers; Mode 3 blows most of the jar on one gorgeous layer. Choosing a
+              mode is choosing how to spend the jar for this screen — and games switch
+              modes between screens, or even mid-frame, to spend it differently.
+            </p>
+          </div>
+
+          <p>
+            Pick a mode below to see its layer line-up and colour budget. The bar
+            width hints at each layer's colour count; OBJ (always 4bpp, 16 colours per
+            palette) rides on top in every mode.
+          </p>
+
+          <div class="lab" id="lab-modes">
+            <div class="lab-head"><span class="dot"></span><span class="title">Mode lab — layers &amp; colour per mode</span><span class="badge">Live</span></div>
+            <div class="lab-body">
+              <div class="seg-btns" data-mode-pick role="group" aria-label="Background mode" style="flex-wrap:wrap">
+                <button data-mode="0">0</button>
+                <button class="on" data-mode="1">1</button>
+                <button data-mode="2">2</button>
+                <button data-mode="3">3</button>
+                <button data-mode="4">4</button>
+                <button data-mode="5">5</button>
+                <button data-mode="6">6</button>
+              </div>
+              <div class="mode-layers" data-mode-layers></div>
+              <div class="lab-readout" data-mode-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Eight modes (0–7) trade layer count against colour depth; register $2105 selects one.</li>
+              <li>Mode 0 = four 2bpp layers; Mode 1 (4/4/2 bpp) is the everyday choice; Mode 3 = one 8bpp layer.</li>
+              <li>Modes 5/6 are 512-wide hi-res; modes 2/4/6 add offset-per-tile.</li>
+              <li>Mode 7 is the odd one out — a single rotatable/scalable layer.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#ppu"><span class="dir">← Prev</span><span class="ttl">08 · The two PPUs &amp; pipeline</span></a>
+            <a class="next" href="#mode7"><span class="dir">Next →</span><span class="ttl">10 · Mode 7</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="mode7">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>Mode 7</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the single rotatable/scalable layer: its 2×2 affine matrix, its fixed-point registers, and the HDMA trick that fakes 3D perspective.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Mode 7 is the effect that defined the SNES. It gives up every other
+            background to grant <em>one</em> layer a superpower: the hardware can
+            <strong>rotate and scale</strong> it per pixel. That's the spinning
+            racetrack of <em>F-Zero</em>, the tilting world map of <em>Super Mario
+            World</em>, the swooping intro of countless games.
+          </p>
+          <p>
+            The magic is a <span class="term" data-tip="A transform that can rotate, scale and shear but keeps parallel lines parallel — described by a 2×2 matrix plus an offset.">affine transform</span>.
+            For every screen pixel, the PPU asks &ldquo;which texel of my
+            128&nbsp;×&nbsp;128-tile map lands here?&rdquo; and answers with a tiny
+            matrix multiply. The four matrix numbers live in registers
+            <code>$211B</code>–<code>$211E</code> — call them
+            <strong>A, B, C, D</strong> — stored as
+            <span class="term" data-tip="A fixed-point format with 1 sign bit, 7 integer bits and 8 fractional bits — how Mode 7's matrix values are stored.">1.7.8 fixed-point</span>
+            (a signed value times 1/256). A rotation by angle θ with zoom is just
+            <code>A=cos·zoom</code>, <code>B=−sin·zoom</code>, <code>C=sin·zoom</code>,
+            <code>D=cos·zoom</code>. A separate centre <code>(X0,&nbsp;Y0)</code> sets
+            the pivot. That's the whole trick: four numbers, updated once per frame,
+            spin an entire world.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A photo on a lazy-Susan</span>
+            <p>
+              Lay a big printed map on a turntable and look down at a fixed window
+              cut in a card above it. Spin the turntable and the map rotates under
+              your window; slide it closer and it magnifies. Mode 7's matrix is the
+              turntable's angle and zoom — and because it recomputes per pixel, the
+              window can look at the map from any angle without ever redrawing it.
+            </p>
+          </div>
+
+          <p>
+            Now the famous part. Rotation and scaling alone give a flat, top-down
+            spin. To get the <em>F-Zero</em> floor receding to a horizon, games rewrite
+            the matrix <strong>on every scanline</strong> using HDMA (Module 13):
+            lines near the bottom use a larger scale (close), lines near the top a
+            smaller one (far). The flat map bends into a perspective plane — a 3D
+            illusion from a strictly 2D chip. Flip the perspective toggle in the lab
+            to see it snap into place.
+          </p>
+
+          <div class="lab" id="lab-mode7">
+            <div class="lab-head"><span class="dot"></span><span class="title">Mode 7 lab — spin the matrix</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall" aria-label="A Mode 7 transformed map"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>Rotate — <span class="val" data-m7-rot-val>30°</span></label><input type="range" min="0" max="360" value="30" data-m7-rot aria-label="Rotation angle"></div>
+                <div class="ctrl"><label>Scale (zoom) — <span class="val" data-m7-scale-val>1.00×</span></label><input type="range" min="25" max="300" value="100" data-m7-scale aria-label="Scale"></div>
+                <div class="ctrl">
+                  <label>Per-scanline perspective</label>
+                  <div class="seg-btns" data-m7-persp role="group" aria-label="Perspective">
+                    <button class="on" data-persp="off">flat</button>
+                    <button data-persp="on">F-Zero floor</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-m7-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Mode 7 is one background the PPU can rotate and scale per pixel via a 2×2 affine matrix.</li>
+              <li>Matrix A/B/C/D live at $211B–$211E as 1.7.8 fixed-point; a centre (X0,Y0) sets the pivot.</li>
+              <li>The map is 128×128 tiles; each screen pixel is one matrix multiply into it.</li>
+              <li>Rewriting the matrix per scanline with HDMA fakes perspective — the racing-floor effect.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#modes"><span class="dir">← Prev</span><span class="ttl">09 · The background modes</span></a>
+            <a class="next" href="#obj"><span class="dir">Next →</span><span class="ttl">11 · Sprites on hardware</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="obj">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>Sprites on hardware</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the real OBJ limits: 128 sprites total, two sizes per frame, and the brutal 32-sprites / 34-tiles-per-scanline ceiling.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 05 introduced sprites conceptually; here are the hardware numbers.
+            The SNES can track <strong>128 sprites</strong> at once in OAM. Each frame
+            you pick <strong>two sizes</strong> from the size table (say 8&nbsp;×&nbsp;8
+            and 16&nbsp;×&nbsp;16, or 16&nbsp;×&nbsp;16 and 32&nbsp;×&nbsp;32), and each
+            sprite is flagged as the small or large one. So far so generous.
+          </p>
+          <p>
+            The catch is per-scanline. As the beam draws each line, the S-PPU1 has only
+            so much time to fetch sprite data, and the limits are hard: at most
+            <strong>32 sprites</strong> may appear on any one scanline, and at most
+            <strong>34 tiles' worth</strong> (8&nbsp;×&nbsp;8 slices) of sprite pixels
+            can be fetched for it. Exceed the sprite count and the PPU raises the
+            <span class="term" data-tip="A status flag ($213E) set when more than 32 sprites fall on a scanline; the extras are dropped from that line.">range-over</span>
+            flag and drops the extras; exceed the tile budget and the
+            <span class="term" data-tip="A status flag set when more than 34 sprite tiles are needed on a scanline; some sprites lose pixels on that line.">time-over</span>
+            flag fires and sprites lose slices. The visible result is the classic SNES
+            <strong>flicker</strong> — sprites winking out when too many crowd one line.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A narrow doorway</span>
+            <p>
+              You can invite 128 guests to the party (OAM), but only 32 fit through the
+              doorway at once (per scanline). Send more and the ones at the back get
+              turned away this trip. Games manage the crowd by cycling which sprites get
+              priority each frame — that's why old flicker <em>shimmers</em> rather than
+              simply vanishing.
+            </p>
+          </div>
+
+          <p>
+            The lab piles sprites onto the screen and enforces the real limits line by
+            line. Dropped sprites are shown faint so you can see exactly where the beam
+            ran out of budget. Hit &ldquo;pile on one line&rdquo; to force the ceiling.
+          </p>
+
+          <div class="lab" id="lab-obj">
+            <div class="lab-head"><span class="dot"></span><span class="title">OBJ limit lab — 32 per scanline</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="Sprites subject to the per-scanline limit"></canvas>
+              <div class="controls">
+                <div class="ctrl"><label>Sprites — <span class="val" data-obj-count-val>40</span> / 128</label><input type="range" min="4" max="128" value="40" data-obj-count aria-label="Sprite count"></div>
+                <div class="ctrl"><label>&nbsp;</label><button class="btn" data-obj-pile>Pile on one line</button></div>
+              </div>
+              <div class="legend">
+                <span class="chip"><i style="background:#a884ff"></i> drawn</span>
+                <span class="chip"><i style="background:rgba(120,110,150,.4)"></i> dropped (over limit)</span>
+              </div>
+              <div class="lab-readout" data-obj-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>128 sprites total in OAM; two selectable sizes per frame.</li>
+              <li>Per scanline: at most 32 sprites and 34 sprite-tiles may be fetched.</li>
+              <li>Over the limit raises range-over / time-over flags and drops sprites — visible as flicker.</li>
+              <li>Games rotate sprite priority each frame to spread the flicker out.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#mode7"><span class="dir">← Prev</span><span class="ttl">10 · Mode 7</span></a>
+            <a class="next" href="#colormath"><span class="dir">Next →</span><span class="ttl">12 · Colour math</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="colormath">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Colour math</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Blend two versions of the screen — main and sub — to get transparency, glows, spotlights and fades the SNES couldn't otherwise draw.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The SNES has no per-pixel alpha channel. It gets translucency a cleverer
+            way: it composes the scene <em>twice</em>. Layers are each assigned to the
+            <span class="term" data-tip="The primary composited image built from the layers you enable for it.">main screen</span>
+            or the <span class="term" data-tip="A second composited image, built from a different set of layers, used as the other operand for colour math.">sub screen</span>,
+            producing two pictures, and then <strong>colour math</strong> combines them
+            pixel by pixel.
+          </p>
+          <p>
+            The operation is simple arithmetic per channel: <strong>add</strong>
+            (main + sub, clamped to 31) or <strong>subtract</strong> (main − sub,
+            clamped to 0), each with an optional <strong>half</strong> that divides the
+            result by two. Add-half of a bright layer over the scene gives a soft glow;
+            subtract darkens for shadow; a plain add of a coloured pane makes stained
+            glass. When there's no sub-screen layer behind a pixel, a
+            <span class="term" data-tip="A programmable constant colour ($2132) used as the sub-screen operand where no sub layer is present.">fixed colour</span>
+            stands in — perfect for fading the whole frame to black or white. And
+            <span class="term" data-tip="Rectangular masks ($2126-$212B) that restrict where colour math (or a layer) applies — used for spotlights and shaped fades.">windows</span>
+            can restrict where the math happens, carving spotlights and iris wipes.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Two projectors on one screen</span>
+            <p>
+              Shine two slide projectors at the same screen. Where both land, the light
+              adds and you get a brighter blend; dim one and the mix shifts. Colour math
+              is that second projector — the sub screen — and the &ldquo;add / subtract /
+              half&rdquo; knobs decide how the two images combine.
+            </p>
+          </div>
+
+          <p>
+            Mix a main and a sub colour below, choose an operation, and read the
+            resulting 15-bit word. This is precisely the per-channel maths the S-PPU2
+            runs for every pixel where colour math is enabled.
+          </p>
+
+          <div class="lab" id="lab-colormath">
+            <div class="lab-head"><span class="dot"></span><span class="title">Colour-math lab — main + sub → result</span><span class="badge">Live</span></div>
+            <div class="lab-body">
+              <div class="swatch-row">
+                <div class="col"><span class="cap">Main screen</span><div class="swatch-lg" data-cm-main></div></div>
+                <div class="op">op</div>
+                <div class="col"><span class="cap">Sub screen</span><div class="swatch-lg" data-cm-sub></div></div>
+                <div class="op">=</div>
+                <div class="col"><span class="cap">Result</span><div class="swatch-lg" data-cm-res></div></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl"><label>Main R</label><input type="range" min="0" max="31" value="24" data-cm-mr aria-label="Main red"></div>
+                <div class="ctrl"><label>Main G</label><input type="range" min="0" max="31" value="10" data-cm-mg aria-label="Main green"></div>
+                <div class="ctrl"><label>Main B</label><input type="range" min="0" max="31" value="8" data-cm-mb aria-label="Main blue"></div>
+                <div class="ctrl"><label>Sub R</label><input type="range" min="0" max="31" value="6" data-cm-sr aria-label="Sub red"></div>
+                <div class="ctrl"><label>Sub G</label><input type="range" min="0" max="31" value="14" data-cm-sg aria-label="Sub green"></div>
+                <div class="ctrl"><label>Sub B</label><input type="range" min="0" max="31" value="28" data-cm-sb aria-label="Sub blue"></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Operation</label>
+                  <div class="seg-btns" data-cm-op role="group" aria-label="Colour math operation">
+                    <button class="on" data-op="add">add</button>
+                    <button data-op="addh">add ½</button>
+                    <button data-op="sub">subtract</button>
+                    <button data-op="subh">sub ½</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-readout" data-cm-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>No alpha channel — the SNES composes a main screen and a sub screen and blends them.</li>
+              <li>Colour math adds or subtracts per channel, optionally halved, clamped to 0–31.</li>
+              <li>A fixed colour substitutes for the sub screen where no sub layer exists — used for full-frame fades.</li>
+              <li>Windows restrict where the math applies, giving spotlights and shaped transitions.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#obj"><span class="dir">← Prev</span><span class="ttl">11 · Sprites on hardware</span></a>
+            <a class="next" href="#hdma"><span class="dir">Next →</span><span class="ttl">13 · HDMA raster tricks</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="hdma">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part II</span></span>
+          <h3>HDMA raster tricks</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Change PPU registers on individual scanlines — automatically — to paint gradients, ripples, mosaics and perspective floors.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A PPU register normally holds one value for the whole frame. But the beam
+            draws the frame one line at a time, and between lines there's an H-blank.
+            What if a register held a <em>different</em> value on every line?
+            <span class="term" data-tip="Horizontal-blank DMA: a hardware channel that writes a preset list of values to PPU registers, one entry per scanline, with no CPU involvement.">HDMA</span>
+            — horizontal-blank DMA — does exactly that. You hand it a small table, and
+            the hardware feeds one entry to a chosen register during each line's
+            H-blank, all frame, with the CPU free to do other work.
+          </p>
+          <p>
+            That one capability is behind a startling number of SNES effects. Feed the
+            <strong>backdrop colour</strong> register a new value each line and you get a
+            smooth sky gradient from a machine with no gradient hardware. Feed a
+            <strong>BG scroll</strong> register a wobbling offset and flat water ripples.
+            Step the <strong>mosaic</strong> register and the screen pixelates from top
+            to bottom for a dissolve. And, as we saw, feed the <strong>Mode 7 matrix</strong>
+            a new scale each line and a flat plane bends into a 3D floor. HDMA is how the
+            SNES turned strict per-scanline timing from a constraint into a paintbrush.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A player piano roll</span>
+            <p>
+              A player piano reads a punched roll: at each moment the roll tells the keys
+              what to do, no pianist needed. An HDMA table is that roll, and the
+              &ldquo;moment&rdquo; is each scanline's H-blank. You punch the pattern once;
+              the hardware plays it down the whole frame, line after line.
+            </p>
+          </div>
+
+          <p>
+            The studio below applies a per-scanline effect to a canvas. Switch between a
+            gradient backdrop, a per-line scroll ripple and a growing mosaic — each is one
+            register being rewritten ~200 times a frame, exactly as HDMA would.
+          </p>
+
+          <div class="lab" id="lab-hdma">
+            <div class="lab-head"><span class="dot"></span><span class="title">HDMA lab — one register, per line</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx tall" aria-label="A per-scanline HDMA effect"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Effect</label>
+                  <div class="seg-btns" data-hd-mode role="group" aria-label="HDMA effect">
+                    <button class="on" data-mode="gradient">gradient sky</button>
+                    <button data-mode="water">ripple water</button>
+                    <button data-mode="mosaic">mosaic dissolve</button>
+                  </div>
+                </div>
+                <div class="ctrl"><label>&nbsp;</label><button class="play-btn" data-hd-play></button></div>
+              </div>
+              <div class="lab-readout" data-hd-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>HDMA writes a table of values to PPU registers, one entry per scanline, during H-blank.</li>
+              <li>Per-line backdrop colour → gradients; per-line scroll → ripples; per-line mosaic → dissolves.</li>
+              <li>Per-line Mode 7 matrix → the perspective racing floor.</li>
+              <li>It runs autonomously, freeing the CPU — the SNES's signature source of &ldquo;how did they do that?&rdquo;.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#colormath"><span class="dir">← Prev</span><span class="ttl">12 · Colour math</span></a>
+            <a class="next" href="#vram"><span class="dir">Next →</span><span class="ttl">14 · VRAM, CGRAM, OAM</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="vram">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part II</span></span>
+          <h3>VRAM, CGRAM, OAM &amp; the port bottleneck</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the CPU reaches the PPU's private memories through a handful of I/O ports — and why the blanking-only rule makes DMA essential.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The three PPU memories aren't on the CPU's address bus — the CPU can't just
+            write VRAM location 5,000 directly. It goes through <strong>ports</strong>:
+            special registers you poke in sequence. To fill VRAM you first set the
+            address with <code>$2116/$2117</code> (low/high byte), choose how the address
+            should <span class="term" data-tip="A setting on $2115 that makes the VRAM address advance automatically after each data write, so you can stream a run of data without resetting the pointer.">auto-increment</span>
+            after each write (by 1, 32, or 128 words, via <code>$2115</code>), then stream
+            data through <code>$2118/$2119</code>. Each write drops two bytes and bumps the
+            pointer — no need to resend the address. CGRAM has its own pair
+            (<code>$2121</code> address, <code>$2122</code> data); OAM uses
+            <code>$2102–$2104</code>.
+          </p>
+          <p>
+            Here's the squeeze. Writing through a port is one value at a time, and
+            (Module 07) you may only do it during blanking. V-blank is only about 2,600
+            CPU cycles — nowhere near enough to hand-write a screen's worth of tiles a byte
+            at a time. The answer is <span class="term" data-tip="Direct Memory Access: hardware that copies a block of bytes to a port far faster than the CPU could in a loop — essential for filling VRAM in V-blank.">DMA</span>:
+            a hardware block-copier that streams hundreds of bytes to the data port far
+            faster than a CPU loop. On the SNES, DMA into VRAM during V-blank isn't a
+            luxury — it's the only way to get graphics in on time. (Its per-scanline
+            cousin HDMA powered Module 13.)
+          </p>
+
+          <p>
+            The simulator below is the VRAM port in miniature. Set the address, pick an
+            increment, then write bytes or auto-fill a burst and watch the pointer march
+            through VRAM. Change the increment to 32 and see the writes stride down a
+            column instead of along a row — exactly how you'd load a tall strip of tiles.
+          </p>
+
+          <div class="lab" id="lab-vram">
+            <div class="lab-head"><span class="dot"></span><span class="title">VRAM-port lab — stream data through $2118/9</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <canvas class="gfx" aria-label="A grid of VRAM words filling as you write"></canvas>
+              <div class="reg-row">
+                <div class="reg"><div class="rk">$2116/7 addr</div><div class="rv" data-vr-raddr>$0000</div></div>
+                <div class="reg"><div class="rk">$2115 increment</div><div class="rv" data-vr-rinc>+1</div></div>
+                <div class="reg"><div class="rk">words written</div><div class="rv" data-vr-rcount>0</div></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl" style="flex:1 1 240px"><label>Start address</label><input type="range" min="0" max="1023" value="0" data-vr-addr aria-label="VRAM start address"></div>
+                <div class="ctrl">
+                  <label>Auto-increment</label>
+                  <div class="seg-btns" data-vr-inc role="group" aria-label="Increment">
+                    <button class="on" data-inc="1">+1</button>
+                    <button data-inc="32">+32</button>
+                    <button data-inc="128">+128</button>
+                  </div>
+                </div>
+              </div>
+              <div class="controls">
+                <div class="ctrl"><label>&nbsp;</label><button class="play-btn" data-vr-write>Write word</button></div>
+                <div class="ctrl"><label>&nbsp;</label><button class="btn" data-vr-fill>DMA burst (64)</button></div>
+                <div class="ctrl"><label>&nbsp;</label><button class="btn" data-vr-reset>Reset</button></div>
+              </div>
+              <div class="lab-readout">showing the first 1,024 of 32,768 VRAM words · the cyan box is the current write pointer</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The CPU reaches VRAM/CGRAM/OAM only through I/O ports, not directly.</li>
+              <li>VRAM: set $2116/7 address, choose increment on $2115, stream data via $2118/9 (auto-incrementing).</li>
+              <li>CGRAM uses $2121/$2122; OAM uses $2102–$2104.</li>
+              <li>Blanking-only writes plus a short V-blank make DMA the essential way to load graphics.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hdma"><span class="dir">← Prev</span><span class="ttl">13 · HDMA raster tricks</span></a>
+            <a class="next" href="#emulate"><span class="dir">Next →</span><span class="ttl">15 · Per-scanline vs per-dot</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating in bsnes</h3>
+          <p>
+            You now know how a real SNES makes a picture. This final part asks the
+            reverse question: how do you rebuild that behaviour in software, faithfully?
+            The answer turns on a single decision — how finely you simulate the beam —
+            and it's the fault line between an emulator that just runs games and one that
+            reproduces the tricks in Modules 10, 12 and 13 exactly. Then we point you at
+            the debug tools that let you watch a live PPU think.
+          </p>
+          <div class="part-meta"><span>Modules <b>15–16</b></span><span>Tools <b>bsnes · Mesen2</b></span><span>Lab <b>1 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="emulate">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>Per-scanline vs per-dot</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand why accurate SNES emulation renders per-dot, and see exactly what breaks when an emulator takes the fast per-scanline shortcut.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            An emulator has to decide how often to re-check the PPU's registers.
+            <span class="term" data-tip="Rendering one whole scanline at a time using the register values latched at the start of that line — fast, but blind to mid-line changes.">Per-scanline</span>
+            rendering reads the registers once per line and draws all 256 dots with those
+            values. It's fast and, for most games, fine. But recall Modules 10, 12 and 13:
+            games change registers <em>during</em> a line via HDMA and precise timing. A
+            per-scanline renderer can't see a change that lands at dot 140 — it already
+            committed the whole line.
+          </p>
+          <p>
+            Accurate emulators — <span class="term" data-tip="A Super NES emulator (formerly higan's SNES core) known for cycle-accurate, per-dot PPU emulation.">bsnes</span>
+            and its lineage — instead render
+            <span class="term" data-tip="Emulating the PPU one dot (pixel-clock tick) at a time, so mid-scanline register writes take effect exactly where they did on hardware.">per-dot</span>:
+            they advance the PPU one pixel-clock at a time, applying every register write at
+            the precise dot it occurred. Mid-scanline colour splits, HDMA windows that move
+            within a line, and raster bars all land correctly. The cost is speed — many more
+            checks per frame — which is why lighter emulators stay per-scanline and quietly
+            miss the subtlest effects.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Reading a sign from a moving train</span>
+            <p>
+              Glance once as your carriage passes a sign and you catch a single word;
+              read it continuously and you get the whole message. Per-scanline emulation
+              glances once per line; per-dot reads the sign the whole way past. For a sign
+              that changes mid-carriage — an HDMA effect — only the continuous reader gets
+              it right.
+            </p>
+          </div>
+
+          <p>
+            Both panels below render the <em>same</em> mid-scanline register change — a
+            colour boundary whose position is rewritten within each line. The per-dot panel
+            follows the boundary smoothly; the per-scanline panel can only latch one value
+            per line group, so the same effect stair-steps. That difference is the whole
+            argument for accurate emulation.
+          </p>
+
+          <div class="lab" id="lab-emulate">
+            <div class="lab-head"><span class="dot"></span><span class="title">Accuracy lab — the same effect, two renderers</span><span class="badge">Canvas · live</span></div>
+            <div class="lab-body">
+              <div class="dual-canvas">
+                <div><span class="cap">per-dot (accurate)</span><canvas class="gfx short" data-em-dot aria-label="Per-dot rendering"></canvas></div>
+                <div><span class="cap">per-scanline (fast)</span><canvas class="gfx short" data-em-line aria-label="Per-scanline rendering"></canvas></div>
+              </div>
+              <div class="lab-readout" data-em-info></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Per-scanline rendering reads registers once per line; per-dot reads them every pixel.</li>
+              <li>HDMA and mid-line timing tricks need per-dot to appear correctly.</li>
+              <li>bsnes renders per-dot for accuracy; faster emulators stay per-scanline and miss some effects.</li>
+              <li>The trade is accuracy versus speed — and it's visible the moment a game changes a register mid-line.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#vram"><span class="dir">← Prev</span><span class="ttl">14 · VRAM, CGRAM, OAM</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">16 · Accuracy &amp; try it</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 16 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 16 <span class="part-tag">· Part III</span></span>
+          <h3>Accuracy &amp; try it</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into a hands-on habit: open a real PPU debugger and watch every concept you've learned, live.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The best way to make all of this permanent is to watch a real game's PPU
+            state while it runs. Modern accuracy-focused emulators ship debuggers that
+            expose exactly the structures this course built up. In
+            <span class="term" data-tip="A multi-system emulator with an excellent SNES debugger, including tile, tilemap, CGRAM/palette, OAM and event viewers.">Mesen2</span>
+            or <span class="term" data-tip="A debugging-oriented fork of bsnes with PPU viewers for VRAM tiles, tilemaps, CGRAM and OAM.">bsnes-plus</span>,
+            open the PPU tools and you'll find one window per module:
+          </p>
+          <ul>
+            <li><strong>Tile / VRAM viewer</strong> — the raw 8×8 tiles from Modules 03–04, decoded from bitplanes at the bit depth you choose.</li>
+            <li><strong>Tilemap viewer</strong> — the 32×32 maps of Module 04, with the scroll registers and per-tile flip/priority laid bare.</li>
+            <li><strong>CGRAM / palette viewer</strong> — the 256 entries of Module 02, updating live as the game fades and cycles colours.</li>
+            <li><strong>OAM / sprite viewer</strong> — the 128 sprites of Modules 05 and 11, with their sizes and the per-scanline count that triggers flicker.</li>
+            <li><strong>Event / timing viewer</strong> — the beam of Module 07 and the HDMA writes of Module 13, plotted against the scanline where they land.</li>
+          </ul>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · An X-ray of a magician</span>
+            <p>
+              You've learned every trick in the act; the debugger is the X-ray that shows
+              the hands doing them. Load a Mode 7 game and scrub a frame: you'll see the
+              matrix registers change line by line (Module 10 + 13), the palette shift for a
+              fade (Module 12), and sprites drop off a crowded scanline (Module 11) — all the
+              theory, caught in the act.
+            </p>
+          </div>
+
+          <p>
+            A great closing experiment: load an <em>F-Zero</em>-style Mode 7 title, open the
+            tilemap and register viewers, and pause on a frame with the floor tilting toward
+            the horizon. Watch the Mode 7 matrix values step down the scanlines — the exact
+            HDMA table from Module 13 — and toggle your emulator between per-scanline and
+            per-dot (Module 15) to see the floor go from stair-stepped to smooth. You're no
+            longer watching a mystery; you're reading a pipeline you know stage by stage.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can follow a picture from an 8×8 bitplane tile, through palettes, layers and colour math, to a scanline on a CRT — the whole SNES PPU.</li>
+              <li>You know the numbers that shaped every SNES game: 256×224, 15-bit BGR, 8 modes, Mode 7's matrix, 128 sprites / 32-per-line, VRAM 64 KB.</li>
+              <li>You can read a PPU debugger as a live map of the S-PPU1/S-PPU2 — and know why accurate emulation renders per-dot.</li>
+              <li>Come full circle: the little framebuffer you painted in <a href="#pixels">Module 01</a> is exactly what the beam is still drawing, one dot at a time.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#emulate"><span class="dir">← Prev</span><span class="ttl">15 · Per-scanline vs per-dot</span></a>
+            <a class="next" href="#pixels"><span class="dir">↺ Restart</span><span class="ttl">01 · Pixels &amp; the framebuffer</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course on the Super Nintendo's picture-processing units,
+          companion to the other <em>Inside the Super Nintendo</em> teardowns. Every
+          picture on this page is drawn procedurally in your browser — the labs are
+          little software PPUs implementing the very algorithms they teach. This page
+          contains <strong>no game artwork</strong>. Hardware details are grounded in
+          public documentation and accuracy-focused emulator source; where exact figures
+          vary by source, the text says so.
+        </p>
+        <p class="src">
+          Source of truth · registers <code>$2100–$213F</code> ·
+          VRAM 64 KB · CGRAM 512 B · OAM 544 B · Mode 7 matrix <code>$211B–$211E</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>

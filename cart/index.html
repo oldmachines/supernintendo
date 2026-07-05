@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Super NES Game Pak — a course on ROM cartridges, save memory &amp; enhancement chips</title>
+<meta name="description" content="A hands-on course in three parts: how a ROM cartridge stores and addresses data from zero, what lives inside a Super Nintendo Game Pak (mask ROM, battery SRAM, the CIC lock and the famous enhancement chips — Super FX, SA-1, DSP-1, S-DD1 and friends), and how bsnes emulates them — with interactive labs so you can watch every concept, not just read it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%237d5cf0%27/%3E%3Crect x=%279%27 y=%277%27 width=%2714%27 height=%2718%27 rx=%272%27 fill=%27none%27 stroke=%27%230c0a13%27 stroke-width=%272.4%27/%3E%3Crect x=%2712%27 y=%2723%27 width=%272.4%27 height=%274%27 fill=%27%23ffce6a%27/%3E%3Crect x=%2717%27 y=%2723%27 width=%272.4%27 height=%274%27 fill=%27%23ffce6a%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Super NES Game Pak</h1>
+        <span class="sub">A course · 13 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · Storage from zero</div>
+      <a href="#rom"><span class="n">01</span><span>ROM vs RAM</span></a>
+      <a href="#decode"><span class="n">02</span><span>Address decoding &amp; banks</span></a>
+      <a href="#sram"><span class="n">03</span><span>Saving without a disk</span></a>
+      <a href="#bus"><span class="n">04</span><span>The cartridge bus</span></a>
+
+      <div class="toc-group">Part II · The Game Pak</div>
+      <a href="#board"><span class="n">05</span><span>Inside a Game Pak</span></a>
+      <a href="#maps"><span class="n">06</span><span>LoROM vs HiROM</span></a>
+      <a href="#save"><span class="n">07</span><span>Save RAM &amp; the RTC</span></a>
+      <a href="#chips"><span class="n">08</span><span>The expansion bus</span></a>
+      <a href="#superfx"><span class="n">09</span><span>The Super FX</span></a>
+      <a href="#sa1"><span class="n">10</span><span>The SA-1</span></a>
+      <a href="#dsp"><span class="n">11</span><span>The DSP &amp; math chips</span></a>
+      <a href="#exotic"><span class="n">12</span><span>Exotic chips</span></a>
+
+      <div class="toc-group">Part III · Emulating in bsnes</div>
+      <a href="#emulate"><span class="n">13</span><span>ROM images &amp; headers</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-cart" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · bsnes-accurate</span>
+          <h2>What the <span class="grad">Super Nintendo</span> read its games from.</h2>
+          <p class="lede">
+            We start from the very beginning — how a chip of frozen bits can hand
+            a byte to a processor — assuming you know nothing about memory. Once
+            the vocabulary is solid, we crack open a Super&nbsp;Nintendo
+            <strong>Game&nbsp;Pak</strong>: the mask ROM, the battery-backed
+            save memory, the region lock, and the astonishing little
+            coprocessors — Super&nbsp;FX, SA-1, the DSPs — that games smuggled
+            in on the cartridge itself. Then we follow the ROM into an emulator.
+            Thirteen modules, each with <strong>live simulations</strong> so you
+            can watch every idea. No game data ships with this page; every ROM
+            you'll see is synthetic, generated in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#rom">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#board">Skip to the Game Pak</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>Storage from zero</h4>
+              <p>ROM vs RAM, how a chip is addressed, chip-select decoding and bank switching, battery-backed saves, and the cartridge bus — the universal vocabulary, from nothing.</p>
+              <div class="cnt">4 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The Game Pak</h4>
+              <p>Inside the shell: the memory map, save RAM &amp; clocks, and the whole zoo of enhancement chips — Super FX, SA-1, DSP-1, S-DD1, SPC7110, CX4.</p>
+              <div class="cnt">8 modules · with labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating in bsnes</h4>
+              <p>The ROM dump, the internal header and the copier header, how an emulator identifies the mapping and re-creates each coprocessor.</p>
+              <div class="cnt">1 module · with lab</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>Storage from zero</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            console yet. It's how <em>every</em> memory chip works: how bits get
+            frozen into a ROM, how a processor picks one byte out of millions by
+            raising address lines, why a small CPU can still reach a big ROM, and
+            how a save survives with the power off. We build the vocabulary one
+            word at a time — ROM, RAM, address line, chip-select, bank, SRAM,
+            bus — and you can watch each idea run live. If a term is ever used
+            before it's explained, that's a bug. Everything in Parts II and III
+            is just these four ideas wired together.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–04</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>4 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="rom">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>ROM vs RAM</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, how a chip full of permanently-frozen bits turns an address into a byte — and how that differs from the forgetful memory the console runs in.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A Super&nbsp;Nintendo game is not a program that gets "installed."
+            It is a chip. Snap a Game&nbsp;Pak apart and the largest object on
+            the little green board is a single black rectangle: the game's
+            <strong>mask ROM</strong>. <span class="term" data-tip="Read-Only Memory — a chip whose bits are fixed permanently and cannot be changed by the machine that reads it.">ROM</span>
+            stands for read-only memory, and <em>mask</em> tells you when the
+            bits were decided: at the semiconductor factory, the 1s and 0s are
+            etched into the silicon by one of the photographic
+            <span class="term" data-tip="A photographic stencil used in chip fabrication. A mask ROM's data is patterned directly into the silicon by these masks, so it can never be rewritten.">masks</span>
+            used to pattern the chip. From that moment the data is frozen. The
+            console can <em>read</em> the ROM a billion times, but it can never
+            write to it — there is physically nothing to write with.
+          </p>
+          <p>
+            That permanence is the whole point. A mask ROM is
+            <span class="term" data-tip="Keeps its contents with no power at all. A mask ROM's bits are structural, so pulling the plug loses nothing.">non-volatile</span>:
+            unplug the console, leave the cartridge in a drawer for thirty years,
+            and every bit is exactly where the factory put it. Contrast that with
+            the console's own working memory. Inside the Super&nbsp;Nintendo sits
+            128&nbsp;KB of <span class="term" data-tip="Random-Access Memory — read/write memory the machine uses as scratch space. It is volatile: cut the power and its contents vanish.">RAM</span>
+            (random-access memory), the scratch pad where the running game keeps
+            its variables. RAM is fast and freely writable, but it is
+            <strong>volatile</strong>: the instant power drops, it forgets
+            everything. ROM remembers forever and never changes; RAM changes
+            constantly and remembers nothing. A game needs both.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A printed book and a notepad</span>
+            <p>
+              A mask <span class="term" data-tip="Read-only memory: contents fixed at manufacture, never changed by the reader.">ROM</span>
+              is a printed book: the words were set in type once at the press,
+              and no reader can rewrite them — but they'll still be there next
+              century. The console's <span class="term" data-tip="Read/write working memory that loses its contents when power is removed.">RAM</span>
+              is the notepad beside you: you scribble and erase freely while
+              reading, but close the book and the notepad is wiped clean. The
+              game is the book; playing it is the scribbling.
+            </p>
+          </div>
+
+          <h4>How a ROM turns an address into a byte</h4>
+          <p>
+            Here's the mechanism, and it is beautifully simple. A ROM has two
+            bundles of wires. One bundle carries the
+            <strong>address</strong> — a number, presented as a pattern of high
+            and low voltages, one wire per bit. These are the
+            <span class="term" data-tip="The input wires that carry the address of the byte you want. n address lines select one of 2^n locations.">address lines</span>,
+            named A0, A1, A2 and up. The other bundle is the
+            <strong>data lines</strong> — D0 through D7 — which the chip drives
+            as its <em>output</em>. Put a number on the address lines and, a few
+            dozen nanoseconds later, the byte stored at that location appears on
+            the data lines. That's the entire contract: <em>address in, data
+            out.</em>
+          </p>
+          <p>
+            The count of address lines sets how much the chip can hold. Each line
+            doubles the reach: <em>n</em> address lines address 2<sup><em>n</em></sup>
+            locations. Eight lines reach 256 bytes; sixteen reach 64&nbsp;KB;
+            twenty-one reach 2&nbsp;MB. Inside, those lines feed a
+            <span class="term" data-tip="Logic that turns the binary address into a one-hot selection: exactly one storage cell is switched onto the data lines.">decoder</span>
+            that lights up exactly one row of storage cells and switches its bits
+            onto the data lines. No moving parts, no seeking, no waiting for a
+            disc to spin around — every byte is equally, instantly reachable.
+            That's what "random access" means.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="A ROM: address lines enter a decoder which selects one cell in a storage array, whose byte is driven out onto the data lines">
+              <defs><marker id="ah01" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <!-- address lines in -->
+              <text x="30" y="34" class="d-tag d-cyan">address in</text>
+              <g class="d-cyan">
+                <rect x="30" y="50" width="26" height="20" rx="4" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="43" y="65" text-anchor="middle" class="d-num">1</text>
+                <rect x="30" y="76" width="26" height="20" rx="4" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="43" y="91" text-anchor="middle" class="d-num">0</text>
+                <rect x="30" y="102" width="26" height="20" rx="4" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="43" y="117" text-anchor="middle" class="d-num">1</text>
+                <rect x="30" y="128" width="26" height="20" rx="4" class="d-fill-panel d-cyan-s" stroke-width="1.3"/><text x="43" y="143" text-anchor="middle" class="d-num">1</text>
+              </g>
+              <text x="30" y="170" class="d-sub">A3…A0</text>
+              <line x1="60" y1="96" x2="120" y2="96" class="d-axis" stroke-width="1.6" marker-end="url(#ah01)"/>
+              <!-- decoder -->
+              <rect x="122" y="52" width="72" height="150" rx="8" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="158" y="122" text-anchor="middle" class="d-label" style="font-size:12px">decoder</text>
+              <text x="158" y="140" text-anchor="middle" class="d-sub">one-hot</text>
+              <!-- cell array -->
+              <text x="230" y="34" class="d-tag">storage array — bits frozen at the fab</text>
+              <g>
+                <rect x="230" y="50" width="360" height="34" rx="5" class="d-fill-panel d-stroke-line" stroke-width="1"/>
+                <rect x="230" y="88" width="360" height="34" rx="5" fill="rgba(255,177,78,0.16)" class="d-amber-s" stroke-width="1.6"/>
+                <rect x="230" y="126" width="360" height="34" rx="5" class="d-fill-panel d-stroke-line" stroke-width="1"/>
+                <rect x="230" y="164" width="360" height="34" rx="5" class="d-fill-panel d-stroke-line" stroke-width="1"/>
+                <text x="600" y="110" class="d-sub d-amber">← selected row</text>
+                <text x="410" y="110" text-anchor="middle" class="d-num d-amber">0 1 0 0 0 0 1 0</text>
+                <text x="410" y="72" text-anchor="middle" class="d-sub">1 0 1 1 0 0 1 1</text>
+                <text x="410" y="148" text-anchor="middle" class="d-sub">1 1 0 0 1 0 1 0</text>
+                <text x="410" y="186" text-anchor="middle" class="d-sub">0 0 1 1 1 1 0 1</text>
+              </g>
+              <line x1="200" y1="105" x2="228" y2="105" class="d-axis" stroke-width="1.6" marker-end="url(#ah01)"/>
+              <!-- data out -->
+              <line x1="592" y1="105" x2="660" y2="105" class="d-axis" stroke-width="1.6" marker-end="url(#ah01)"/>
+              <text x="690" y="34" class="d-tag d-magenta">data out</text>
+              <rect x="666" y="80" width="200" height="50" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="766" y="103" text-anchor="middle" class="d-label d-magenta" style="font-size:13px">$42</text>
+              <text x="766" y="120" text-anchor="middle" class="d-sub">D7…D0 = 0100 0010</text>
+              <text x="230" y="238" class="d-flow">address $B (=1011) selects one row → its byte is driven onto the data lines. Address in, data out.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Address in, data out.</strong> A pattern of voltages on the <span class="term" data-tip="Input wires carrying the binary address; n of them select one of 2^n locations.">address lines</span> is decoded to select exactly one stored location; that location's byte appears on the <span class="term" data-tip="The eight output wires D0–D7 that carry the byte the ROM read out.">data lines</span>. There is no motion and no waiting — every byte is equally reachable.</figcaption>
+          </figure>
+
+          <p>
+            The lab below is that mechanism made visible. Drive the address with
+            the slider and watch the addressed cell light up in a 256-byte mask
+            ROM, its stored byte appearing bit-for-bit on the data lines. The
+            contents never change no matter how many times you read them — that
+            is what "read-only" and "non-volatile" feel like in motion.
+          </p>
+
+          <div class="lab" id="lab-romread">
+            <div class="lab-head"><span class="dot"></span><span class="title">ROM-read lab — drive an address, read a byte</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="Address lines feeding a 256-byte ROM cell grid, with the selected byte appearing on the data lines"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Address (A0–A7)</label>
+                  <input type="range" min="0" max="255" value="66" step="1" data-rom-addr aria-label="ROM address">
+                </div>
+                <div class="readouts">
+                  <span class="readout">Address <b data-rom-ahex>—</b></span>
+                  <span class="readout">Data out <b data-rom-dhex>—</b></span>
+                </div>
+                <span class="sim-note">A synthetic 256-byte mask ROM. The bytes are fixed; only the address you present changes what appears on the bus.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A Game Pak's main content is a mask ROM: bits fixed at the fab, read-only and non-volatile (kept with no power).</li>
+              <li>The console's own 128 KB of RAM is the opposite: freely writable but volatile — it forgets everything when power drops.</li>
+              <li>A ROM's job is a contract: put an address on the address lines, get that location's byte on the data lines.</li>
+              <li>n address lines reach 2ⁿ locations; access is instant and uniform — "random access."</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#decode"><span class="dir">Next →</span><span class="ttl">02 · Address decoding &amp; banks</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="decode">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Address decoding &amp; bank switching</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how a single set of address lines can be shared between ROM, RAM and registers via chip-select decoding — and how "banks" let a processor reach far more memory than its address bus seems to allow.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 01 had a ROM alone on its wires. A real console is a
+            crowd: the same address and data lines are shared by the work RAM,
+            the picture and sound chips' registers, and the cartridge. If two of
+            them tried to drive the data lines at once, you'd get a garbage
+            collision. So something must decide, for every single access,
+            <em>which</em> device is allowed to answer. That job is
+            <strong>address decoding</strong>, and its output is a set of
+            <span class="term" data-tip="A signal, usually active-low (/CS), that switches exactly one memory device or register block onto the shared bus for a given address.">chip-select</span>
+            signals — one per device, and never more than one active at a time.
+          </p>
+          <p>
+            The decoder is just logic watching the <em>top</em> address lines.
+            The low lines pick a byte <em>within</em> a device; the high lines
+            pick <em>which</em> device. On the Super&nbsp;Nintendo's 65816, a
+            memory access carries a 24-bit address split into an 8-bit
+            <span class="term" data-tip="The high 8 bits of a 24-bit SNES address (A16–A23). It selects one of 256 64 KB banks.">bank</span>
+            number and a 16-bit offset within that bank. Inside the ordinary
+            "system" banks, the offset alone tells the decoder everything: low
+            addresses map to work RAM, a middle window to the console's
+            registers, and the top half of the bank (<code>$8000–$FFFF</code>)
+            to the cartridge — that's the <code>/CART</code> select the Game&nbsp;Pak
+            listens for.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · An apartment building</span>
+            <p>
+              A 24-bit address is a mailing address for a byte. The
+              <span class="term" data-tip="The high byte of the address that picks one of 256 64 KB regions.">bank</span>
+              is the building number; the 16-bit offset is the apartment. The
+              mail carrier (the decoder) reads the building number to pick the
+              right building — that's the
+              <span class="term" data-tip="The active-low signal that wakes exactly one device for a given address.">chip-select</span>
+              — and only then walks to the specific apartment. No two buildings
+              share a number, so mail never lands in two places at once.
+            </p>
+          </div>
+
+          <h4>Bank switching: reaching more than you can address</h4>
+          <p>
+            Now the twist that makes cartridges interesting. A humble 8-bit CPU
+            with only 16 address lines can point at just 64&nbsp;KB — but games
+            were far bigger. The classic fix, older than the SNES, is
+            <span class="term" data-tip="Mapping different large regions of a big memory into the CPU's small address window at different times, by switching which region is visible.">bank switching</span>:
+            the CPU's small window looks onto a big memory through a hatch, and a
+            latch decides <em>which</em> slice of the big memory the hatch
+            currently shows. Change the latch and a different 32&nbsp;KB of ROM
+            appears at the same addresses. The Super&nbsp;Nintendo's 65816 is
+            more generous — its 24 address lines natively reach 16&nbsp;MB, so it
+            rarely <em>needs</em> crude bank switching — but the same idea returns
+            in Part II as the whole basis of the LoROM and HiROM memory maps, and
+            enhancement chips like the SA-1 lean on a bank-switching unit to give
+            themselves a bigger reach.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="A 64 KB bank split into WRAM, register and cartridge ROM regions, with the top address lines selecting which chip-select fires">
+              <text x="30" y="30" class="d-tag">One 64 KB bank — offset $0000 … $FFFF</text>
+              <rect x="30"  y="46" width="150" height="46" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="105" y="66" text-anchor="middle" class="d-sub d-cyan">/WRAM</text>
+              <text x="105" y="82" text-anchor="middle" class="d-sub">$0000–$1FFF</text>
+              <rect x="180" y="46" width="230" height="46" rx="6" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="295" y="66" text-anchor="middle" class="d-sub d-violet">/IO — PPU / APU regs</text>
+              <text x="295" y="82" text-anchor="middle" class="d-sub">$2000–$5FFF</text>
+              <rect x="410" y="46" width="120" height="46" rx="6" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="470" y="66" text-anchor="middle" class="d-sub d-amber">/SRAM</text>
+              <text x="470" y="82" text-anchor="middle" class="d-sub">$6000–$7FFF</text>
+              <rect x="530" y="46" width="340" height="46" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="700" y="66" text-anchor="middle" class="d-sub d-magenta">/CART — cartridge ROM</text>
+              <text x="700" y="82" text-anchor="middle" class="d-sub">$8000–$FFFF</text>
+              <!-- decode -->
+              <text x="30" y="140" class="d-tag">the decoder only watches the top lines</text>
+              <rect x="30" y="152" width="150" height="30" rx="6" class="d-fill-panel2 d-stroke-line" stroke-width="1"/>
+              <text x="105" y="171" text-anchor="middle" class="d-num">A15 A14 A13</text>
+              <line x1="180" y1="167" x2="240" y2="167" class="d-axis" stroke-width="1.6"/>
+              <text x="250" y="164" class="d-sub">000 → WRAM · 001–010 → I/O</text>
+              <text x="250" y="182" class="d-sub">011 → SRAM · 1xx → cartridge ROM</text>
+              <text x="30" y="222" class="d-flow">Only one chip-select is ever low at a time — no two devices fight for the data lines.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Chip-select decoding.</strong> The low address bits pick a byte inside a device; the high bits pick the device. In a system bank the top three lines split the 64 KB into work RAM, registers, an optional SRAM window and cartridge ROM — exactly one <span class="term" data-tip="The signal that switches a single device onto the shared bus.">chip-select</span> at a time.</figcaption>
+          </figure>
+
+          <p>
+            The lab lets you sweep an address across one 64&nbsp;KB bank and watch
+            the chip-selects fire. Notice how the top three address lines alone
+            decide the region — and that the cartridge only ever answers in the
+            upper half of the bank, the fact the LoROM map (Module 06) is built
+            on.
+          </p>
+
+          <div class="lab" id="lab-decode">
+            <div class="lab-head"><span class="dot"></span><span class="title">Decoder lab — which chip-select fires?</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="A 64 KB bank bar with a movable pointer showing which chip-select region an address falls in"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Offset within bank</label>
+                  <input type="range" min="0" max="65535" value="33024" step="256" data-dec-off aria-label="Address offset">
+                </div>
+                <div class="readouts">
+                  <span class="readout">Offset <b data-dec-addr>—</b></span>
+                  <span class="readout">Active select <b data-dec-cs>—</b></span>
+                </div>
+                <span class="sim-note">This is the decode for a "system" bank ($00–$3F / $80–$BF). Banks $7E–$7F are all work RAM; higher banks are all cartridge ROM.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Many devices share one set of address/data lines; a decoder issues one chip-select at a time so only one answers.</li>
+              <li>Low address lines pick a byte within a device; high lines pick which device — that's all "decoding" is.</li>
+              <li>On the SNES a 24-bit address = an 8-bit bank + a 16-bit offset; the cartridge answers in the top half of system banks.</li>
+              <li>Bank switching maps a big memory into a small window a slice at a time — the seed of the LoROM/HiROM maps in Part II.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#rom"><span class="dir">← Prev</span><span class="ttl">01 · ROM vs RAM</span></a>
+            <a class="next" href="#sram"><span class="dir">Next →</span><span class="ttl">03 · Saving without a disk</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="sram">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Saving without a disk</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Solve the puzzle of persistent saves on a cartridge that has no disk and a ROM that can't be written — with a tiny static RAM and a coin cell.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The mask ROM can't be written, and the console's work RAM forgets on
+            power-off. So where does a saved game go? On the Super&nbsp;Nintendo
+            the answer lives on the cartridge, and it is delightfully low-tech: a
+            small <strong>static RAM</strong> chip with a <strong>battery</strong>
+            wired to keep it awake. <span class="term" data-tip="Static RAM — read/write memory that holds its value with a trickle of current and no periodic refresh, as long as it stays powered.">SRAM</span>
+            is ordinary read/write memory — volatile like any RAM — but it draws
+            almost nothing to <em>hold</em> a value once written. Pair it with a
+            3-volt lithium <span class="term" data-tip="A small lithium cell (like a watch battery) soldered onto the cartridge that keeps the save SRAM powered while the console is off.">coin cell</span>
+            soldered onto the board, and the SRAM stays powered even when the
+            console is unplugged. The save persists not because the memory is
+            non-volatile, but because you never actually turn it off.
+          </p>
+          <p>
+            When you play, the console powers the SRAM and the game reads and
+            writes it like any other RAM — through its own chip-select window
+            (Module 02), using the <code>/WR</code> strobe. When you switch the
+            console off, a little steering circuit disconnects the SRAM from the
+            dead console supply and connects it to the coin cell instead, which
+            trickles just enough current to preserve the bits. Because the draw
+            is tiny, a single cell can keep a save alive for
+            <em>years</em> — often a decade or more.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A night-light on the memory</span>
+            <p>
+              Volatile memory is a room lit only while the mains are on: cut the
+              power and the room goes dark, and whatever was written on the
+              whiteboard is "forgotten" (the chip can't hold its state). Battery
+              <span class="term" data-tip="Static RAM kept powered by a small on-cart battery so its contents survive power-off.">SRAM</span>
+              is that same room with a tiny battery-powered night-light that
+              never goes out. Nothing on the whiteboard is special — it just
+              never gets dark enough to lose it. When the battery finally dies,
+              the light goes out and, one day, so does the save.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 230" role="img" aria-label="Battery-backed SRAM stays powered by a coin cell when the console is off, while volatile work RAM loses its contents">
+              <text x="30" y="30" class="d-tag d-amber">Battery-backed SRAM (on the cartridge)</text>
+              <rect x="30" y="44" width="360" height="70" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="60" y="72" class="d-label" style="font-size:13px">SRAM</text>
+              <text x="60" y="94" class="d-sub">save data · 2–256 Kbit</text>
+              <circle cx="330" cy="79" r="22" fill="rgba(95,209,139,0.18)" stroke="#5fd18b" stroke-width="1.6"/>
+              <text x="330" y="83" text-anchor="middle" class="d-sub" style="fill:#5fd18b">3V</text>
+              <text x="30" y="138" class="d-sub" style="fill:#5fd18b">power off → coin cell keeps it lit → save survives ✓</text>
+
+              <text x="500" y="30" class="d-tag d-cyan">Work RAM (inside the console)</text>
+              <rect x="500" y="44" width="360" height="70" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="530" y="72" class="d-label" style="font-size:13px">WRAM</text>
+              <text x="530" y="94" class="d-sub">128 KB scratch — volatile</text>
+              <text x="500" y="138" class="d-sub" style="fill:#ff6a6a">power off → no battery → contents lost ✕</text>
+
+              <text x="30" y="188" class="d-flow">Same kind of RAM in both boxes. The only difference is the little battery — and that is the whole trick.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The save trick.</strong> The saved game lives in a normal, volatile SRAM — but a coin cell on the cartridge keeps it powered when the console is off, so it never actually loses its bits. The console's own work RAM has no such battery and forgets everything at power-down.</figcaption>
+          </figure>
+
+          <p>
+            The lab makes the difference tangible. Write a save into both a
+            battery-backed SRAM and the volatile work RAM, then hit
+            <strong>Power off</strong>: the SRAM holds its bytes while the work
+            RAM settles into meaningless garbage. This exact behaviour — and the
+            slow death of an aging coin cell — is why old cartridges eventually
+            "lose their saves."
+          </p>
+
+          <div class="lab" id="lab-sram">
+            <div class="lab-head"><span class="dot"></span><span class="title">Battery-SRAM lab — write a save, pull the plug</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="Two memory rows — battery SRAM and volatile work RAM — that respond differently to power off"></canvas>
+              <div class="controls">
+                <button class="play-btn" data-sram-write>Write save</button>
+                <button class="reset-btn" data-sram-power>Toggle power</button>
+                <div class="readouts">
+                  <span class="readout">State <b data-sram-state>—</b></span>
+                </div>
+                <span class="sim-note">Write the save, then toggle power off: the coin-cell SRAM keeps its nibbles; the volatile RAM decays to garbage.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Saves can't go in the ROM (read-only) or the console's RAM (volatile), so they go in on-cart SRAM.</li>
+              <li>SRAM is ordinary volatile memory, but a soldered 3 V coin cell keeps it powered so the save persists with the console off.</li>
+              <li>The game reads/writes SRAM through its own chip-select window using the /WR strobe, like any RAM.</li>
+              <li>A dying battery is why decades-old cartridges eventually lose their saved games.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#decode"><span class="dir">← Prev</span><span class="ttl">02 · Address decoding &amp; banks</span></a>
+            <a class="next" href="#bus"><span class="dir">Next →</span><span class="ttl">04 · The cartridge bus</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="bus">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>The cartridge bus</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand what those gold fingers on a Game Pak actually carry — and why exposing the CPU's own bus is the single fact that made SNES enhancement chips possible.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Turn a Game&nbsp;Pak over and you see a row of gold contacts — the
+            <span class="term" data-tip="The set of gold contacts on the cartridge board that plug into the console; it carries the CPU bus out to the cartridge.">edge connector</span>.
+            Here is the crucial thing to internalise, because the whole second
+            half of this course flows from it: those contacts are essentially the
+            <strong>65816's own address and data bus, brought straight out to the
+            slot</strong>, plus a handful of control, clock and expansion pins.
+            When you insert a cartridge, you are not attaching a passive data
+            store off in the distance — you are wiring new chips
+            <em>directly onto the processor's bus</em>, where they can watch every
+            address the CPU emits and answer it in real time.
+          </p>
+          <p>
+            Walk the pins. There are 24 <strong>address lines</strong> (A0–A23),
+            enough to name any byte in the 16&nbsp;MB space. There are 8
+            bidirectional <strong>data lines</strong> (D0–D7): the SNES moves one
+            byte at a time. There are the read and write strobes
+            (<code>/RD</code>, <code>/WR</code>) that say <em>when</em> and
+            <em>which direction</em> an access goes; the cartridge chip-select
+            (<code>/CART</code>) from Module 02; the CPU clock (<code>φ2</code>)
+            so on-cart chips stay in step; a DRAM <code>/REFRESH</code> pulse;
+            <code>/RESET</code> and <code>/IRQ</code>; audio lines routed through
+            the connector; power and ground; and a few
+            <span class="term" data-tip="Spare bus and control pins on the connector that let extra hardware on the cartridge hang directly off the CPU.">expansion</span>
+            pins. That last group is the open door.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A desk with a spare chair pulled up</span>
+            <p>
+              Most consoles treat the cartridge slot like a mail slot: you post
+              data in and it trickles to the CPU. The Super&nbsp;Nintendo instead
+              pulls a <em>chair up to the CPU's own desk</em> and hands whoever
+              sits there the same address book and the same in/out trays the
+              processor uses. A plain ROM just reads from the trays. But nothing
+              stops a far cleverer guest — a whole second processor — from taking
+              that seat. That is precisely what the enhancement chips did.
+            </p>
+          </div>
+
+          <p>
+            Why does this matter so much? Because a cartridge that can see the
+            CPU bus directly can contain <em>active</em> hardware that
+            participates in the machine — memory that decodes its own accesses,
+            or a coprocessor that the CPU can hand work to and read results back
+            from through ordinary reads and writes. The connector isn't a
+            loading dock; it's an <strong>expansion port</strong>. Hold that
+            thought: Module 08 opens it fully, and Modules 09–12 meet the chips
+            that walked through it.
+          </p>
+
+          <p>
+            The lab is a pin-by-pin explorer. Hover any contact on the edge
+            connector to see what it carries and why it's there — the address and
+            data lines you already know, the strobes and clocks, and the humble
+            expansion pins that changed what a cartridge could be.
+          </p>
+
+          <div class="lab" id="lab-pinout">
+            <div class="lab-head"><span class="dot"></span><span class="title">Connector lab — walk the cartridge bus</span><span class="badge">Canvas · hover</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="An edge connector with hoverable pins grouped into address, data, control, clock, power, audio and expansion"></canvas>
+              <div class="explain idle" data-pin-panel>
+                <div class="name" data-pin-name>Hover a pin…</div>
+                <div class="desc" data-pin-desc>Each gold contact carries one signal of the CPU bus out to the cartridge. Address lines in, data lines out, plus the strobes, clocks and expansion pins that let on-cart chips join the machine.</div>
+              </div>
+              <span class="sim-note">A representative slice of the ~62-pin connector, colour-coded by signal group. The real pinout has more address/data pins; the idea is the same.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The Game Pak edge connector is the 65816's own address/data bus, plus control, clock, audio and expansion pins.</li>
+              <li>24 address lines (A0–A23) reach 16 MB; 8 data lines (D0–D7) move one byte per access; /RD, /WR, /CART, φ2 govern timing and selection.</li>
+              <li>Because chips on the cartridge see the CPU bus directly, they can be active participants, not just passive storage.</li>
+              <li>The expansion pins turn the slot into an expansion port — the reason enhancement chips were possible.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sram"><span class="dir">← Prev</span><span class="ttl">03 · Saving without a disk</span></a>
+            <a class="next" href="#board"><span class="dir">Next → Part II</span><span class="ttl">05 · Inside a Game Pak</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The Game Pak</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into a real cartridge. We open the
+            shell to name every part, learn the two ways a ROM projects itself
+            into the CPU's address space (LoROM and HiROM), see where saves and
+            clocks live, and then spend five modules with the reason SNES
+            cartridges are legendary among hardware people: the
+            <strong>enhancement chips</strong>. Because the connector exposes the
+            CPU bus, cartridges could smuggle in accelerators, second CPUs, math
+            units and decompressors. We'll meet the Super&nbsp;FX, the SA-1, the
+            DSP family, and the exotic compression chips — real names, real
+            clocks, real games.
+          </p>
+          <div class="part-meta"><span>Modules <b>05–12</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>8 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="board">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part II</span></span>
+          <h3>Inside a Game Pak</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Identify every component on a Super Nintendo cartridge board — including the CIC lockout chip — and the shell differences between SNES and Super Famicom paks.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Crack the shell and the board is refreshingly legible. At minimum a
+            Game&nbsp;Pak holds exactly one thing: a <strong>mask ROM</strong>
+            (Module 01), 4 to 48&nbsp;<span class="term" data-tip="Megabit — a million bits, or 128 KB. SNES ROM sizes were quoted in megabits: an 8 Mbit ROM is 1 MB.">megabits</span>
+            of frozen game, its data lines wired to the connector. Many carts add
+            a save <strong>SRAM</strong> and its <strong>coin cell</strong>
+            (Module 03). Some add an <strong>enhancement chip</strong> — the star
+            of the coming modules. And nearly every licensed cartridge carries one
+            more, easy-to-miss part: a small four-legged chip called the
+            <span class="term" data-tip="Checking Integrated Circuit — Nintendo's lockout chip. It handshakes with a matching chip in the console; fail the handshake and the console is held in reset.">CIC</span>.
+          </p>
+          <p>
+            The CIC (Checking Integrated Circuit) is the region and authentication
+            lock. A matching CIC sits in the console, and the two run a little
+            lockstep handshake — a stream generated on both sides that must agree.
+            If the cartridge CIC is missing, wrong, or from the wrong region, the
+            console's CIC yanks <code>/RESET</code> low and holds the machine in a
+            reset loop — the classic blinking, never-booting console. It is why an
+            American Super&nbsp;Nintendo won't run a Japanese
+            <span class="term" data-tip="The Japanese name and console for the Super Nintendo. Its cartridges have a rounded shell and different notches from the boxier US SNES pak.">Super Famicom</span>
+            cartridge without modification, and why the two regions used
+            different-shaped shells in the first place: the US SNES pak is boxy
+            with locking tabs, the Super&nbsp;Famicom pak rounded, with different
+            cartridge-slot notches so the wrong shape won't even fit.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="A Game Pak board with mask ROM, save SRAM, coin cell, enhancement chip, CIC lockout and the edge connector">
+              <rect x="40" y="40" width="820" height="150" rx="12" fill="rgba(69,228,209,0.05)" class="d-stroke-line" stroke-width="1.2"/>
+              <rect x="70" y="70" width="200" height="90" rx="8" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="170" y="112" text-anchor="middle" class="d-label" style="font-size:13px">Mask ROM</text>
+              <text x="170" y="132" text-anchor="middle" class="d-sub">the game · 4–48 Mbit</text>
+              <rect x="300" y="70" width="150" height="90" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="375" y="108" text-anchor="middle" class="d-label d-magenta" style="font-size:12px">Enhancement</text>
+              <text x="375" y="126" text-anchor="middle" class="d-sub">chip (optional)</text>
+              <rect x="480" y="70" width="120" height="55" rx="8" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="540" y="102" text-anchor="middle" class="d-sub d-amber">Save SRAM</text>
+              <circle cx="540" cy="150" r="18" fill="rgba(95,209,139,0.18)" stroke="#5fd18b" stroke-width="1.5"/>
+              <text x="540" y="154" text-anchor="middle" class="d-sub" style="fill:#5fd18b">3V</text>
+              <rect x="630" y="70" width="80" height="55" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="670" y="102" text-anchor="middle" class="d-sub d-violet">CIC</text>
+              <text x="670" y="140" text-anchor="middle" class="d-sub">lockout</text>
+              <!-- edge connector -->
+              <rect x="70" y="172" width="720" height="14" rx="3" fill="rgba(255,206,106,0.18)" stroke="#ffb14e" stroke-width="1"/>
+              <text x="800" y="184" class="d-sub d-amber">gold fingers → bus</text>
+              <text x="70" y="220" class="d-flow">Everything on this board sees the CPU bus through the gold connector at the bottom (Module 04).</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>A Game Pak, named.</strong> The one guaranteed part is the mask ROM; save SRAM + battery, an enhancement chip, and the <span class="term" data-tip="Nintendo's lockout chip that must handshake with the console or the machine stays in reset.">CIC</span> lockout are the optional company. All of it hangs off the edge connector's bus.</figcaption>
+          </figure>
+
+          <div class="specs">
+            <div class="spec"><div class="k">ROM size</div><div class="v">4–48<small> Mbit</small></div><div class="d">0.5–6 MB of game</div></div>
+            <div class="spec"><div class="k">Data bus</div><div class="v">8<small> bit</small></div><div class="d">D0–D7, one byte/access</div></div>
+            <div class="spec"><div class="k">Address</div><div class="v">24<small> bit</small></div><div class="d">16 MB reachable space</div></div>
+            <div class="spec"><div class="k">Save</div><div class="v">SRAM</div><div class="d">battery-backed, optional</div></div>
+            <div class="spec"><div class="k">Lock</div><div class="v">CIC</div><div class="d">region + authentication</div></div>
+            <div class="spec"><div class="k">Shell</div><div class="v">2 shapes</div><div class="d">SNES boxy · SFC rounded</div></div>
+          </div>
+
+          <p>
+            The lab is an interactive board. Click each component to learn its
+            role — mask ROM, save SRAM, coin cell, enhancement chip, CIC lockout,
+            and the edge connector that ties them to the bus.
+          </p>
+
+          <div class="lab" id="lab-board">
+            <div class="lab-head"><span class="dot"></span><span class="title">Board lab — click the components</span><span class="badge">Canvas · click</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A cartridge board whose components can be clicked to reveal their function"></canvas>
+              <div class="explain idle" data-board-panel>
+                <div class="name" data-board-name>Click a part…</div>
+                <div class="desc" data-board-desc>Every Game Pak has a mask ROM. The rest — save SRAM, its coin cell, an enhancement chip and the CIC lockout — are optional, and together they explain almost everything a SNES cartridge could do.</div>
+              </div>
+              <span class="sim-note">A representative board layout. Real cartridges vary in placement, but the cast of parts is this.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The one guaranteed part is the mask ROM (4–48 Mbit); SRAM+battery and an enhancement chip are optional additions.</li>
+              <li>The CIC lockout handshakes with a twin in the console; failure holds the machine in reset — this is the region lock.</li>
+              <li>SNES and Super Famicom paks use different shell shapes and slot notches, which (with the CIC region) enforce regional separation.</li>
+              <li>Everything on the board communicates through the edge connector's exposed CPU bus.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#bus"><span class="dir">← Prev · Part I</span><span class="ttl">04 · The cartridge bus</span></a>
+            <a class="next" href="#maps"><span class="dir">Next →</span><span class="ttl">06 · LoROM vs HiROM</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="maps">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part II</span></span>
+          <h3>The memory map: LoROM vs HiROM</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn the two standard ways a cartridge ROM projects itself into the 24-bit address space, how to convert between a ROM-file offset and a CPU address, and what FastROM buys.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A ROM chip stores its bytes at offsets 0, 1, 2, 3… but the CPU never
+            asks for "offset 12345." It emits 24-bit
+            <em>addresses</em>, and the cartridge's wiring decides how those
+            addresses land on the ROM's own address lines. There are two dominant
+            wiring conventions, and every game picks one. They're called
+            <span class="term" data-tip="A memory map that places 32 KB of ROM in the upper half ($8000–$FFFF) of each bank, leaving the lower half for system use.">LoROM</span>
+            and <span class="term" data-tip="A memory map that uses the full 64 KB of each bank ($0000–$FFFF) for ROM, giving larger contiguous runs.">HiROM</span>.
+          </p>
+          <p>
+            <strong>LoROM</strong> maps 32&nbsp;KB of ROM into the
+            <em>upper</em> half of each bank (<code>$8000–$FFFF</code>), leaving
+            the lower half of the system banks free for RAM and registers — the
+            layout from Module 02. Each successive 32&nbsp;KB slab of the ROM file
+            appears in the next bank. <strong>HiROM</strong> instead uses the
+            <em>whole</em> 64&nbsp;KB of a bank for ROM
+            (<code>$0000–$FFFF</code> in banks <code>$C0</code> upward), so each
+            bank holds twice as much and big contiguous data (like sampled audio
+            or long tables) doesn't get chopped every 32&nbsp;KB. Both maps also
+            <span class="term" data-tip="The same ROM appearing at more than one address range because the decode ignores some high address bits.">mirror</span>
+            the ROM into other bank ranges, and both reserve a spot for save SRAM
+            (Module 07).
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 250" role="img" aria-label="LoROM places 32 KB of ROM in the top half of each bank; HiROM uses whole 64 KB banks">
+              <text x="30" y="28" class="d-tag d-cyan">LoROM — 32 KB in the top half of each bank</text>
+              <g>
+                <rect x="30" y="42" width="120" height="60" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <rect x="30" y="42" width="120" height="30" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+                <text x="90" y="62" text-anchor="middle" class="d-sub d-cyan">ROM $8000+</text>
+                <text x="90" y="92" text-anchor="middle" class="d-sub">RAM / I/O</text>
+                <rect x="160" y="42" width="120" height="60" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <rect x="160" y="42" width="120" height="30" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+                <text x="220" y="62" text-anchor="middle" class="d-sub d-cyan">ROM</text>
+                <rect x="290" y="42" width="120" height="60" rx="6" class="d-fill-ground d-stroke-line" stroke-width="1"/>
+                <rect x="290" y="42" width="120" height="30" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+                <text x="350" y="62" text-anchor="middle" class="d-sub d-cyan">ROM</text>
+              </g>
+              <text x="30" y="126" class="d-sub">bank $00 · $01 · $02 …  each contributes 32 KB</text>
+
+              <text x="480" y="28" class="d-tag d-magenta">HiROM — full 64 KB banks</text>
+              <g>
+                <rect x="480" y="42" width="110" height="90" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+                <text x="535" y="90" text-anchor="middle" class="d-sub d-magenta">ROM (64 KB)</text>
+                <rect x="600" y="42" width="110" height="90" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+                <text x="655" y="90" text-anchor="middle" class="d-sub d-magenta">ROM (64 KB)</text>
+                <rect x="720" y="42" width="110" height="90" rx="6" class="d-fill-panel d-magenta-s" stroke-width="1.4"/>
+                <text x="775" y="90" text-anchor="middle" class="d-sub d-magenta">ROM (64 KB)</text>
+              </g>
+              <text x="480" y="152" class="d-sub">bank $C0 · $C1 · $C2 …  twice the data per bank</text>
+
+              <text x="30" y="196" class="d-flow">LoROM offset → addr:  bank = offset ÷ $8000,  addr = $8000 + (offset mod $8000)</text>
+              <text x="30" y="220" class="d-flow">HiROM offset → addr:  bank = $C0 + (offset ÷ $10000),  addr = offset mod $10000</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Two projections of the same file.</strong> <span class="term" data-tip="32 KB of ROM in each bank's upper half.">LoROM</span> keeps the lower half of banks free for the system and stitches 32 KB slabs across banks; <span class="term" data-tip="Full 64 KB banks of ROM.">HiROM</span> spends whole banks on ROM for bigger contiguous runs. The arithmetic below converts a file offset to the CPU address it appears at.</figcaption>
+          </figure>
+
+          <h4>FastROM: the same map, sped up</h4>
+          <p>
+            One orthogonal knob: <span class="term" data-tip="A mode where ROM in the $80–$FF bank image is read at 3.58 MHz instead of 2.68 MHz, by setting a memory-speed bit and running the CPU faster there.">FastROM</span>.
+            The 65816 can read the cartridge at two speeds. In the lower bank
+            image the CPU runs its slow 2.68&nbsp;MHz memory cycle; in the
+            <code>$80–$FF</code> image, if the game sets a speed bit, the same ROM
+            is read at 3.58&nbsp;MHz. FastROM isn't a different layout — it's the
+            <em>same</em> LoROM or HiROM ROM, addressed through the high-bank
+            mirror with the fast timing enabled. Games that wanted the extra
+            headroom simply ran their code from the <code>$80+</code> image.
+          </p>
+
+          <p>
+            The lab is a two-way translator. Pick LoROM or HiROM, type a ROM-file
+            offset to see the CPU address it appears at, or type a CPU address to
+            see which file offset it reads — the exact conversion an emulator or a
+            debugger does thousands of times a second.
+          </p>
+
+          <div class="lab" id="lab-maps">
+            <div class="lab-head"><span class="dot"></span><span class="title">Map lab — offset ⇄ CPU address</span><span class="badge">DOM · calculator</span></div>
+            <div class="lab-body">
+              <div class="ctrl">
+                <label>Memory map</label>
+                <div class="seg-btns" role="group" aria-label="Memory map">
+                  <button class="on" data-xl-map="lorom">LoROM</button>
+                  <button data-xl-map="hirom">HiROM</button>
+                </div>
+              </div>
+              <div class="xlate">
+                <div class="ctrl">
+                  <label>ROM file offset (hex)</label>
+                  <input type="text" data-xl-off value="018000" spellcheck="false" aria-label="ROM file offset">
+                  <span class="val">→ CPU addr <b data-xl-addr>—</b></span>
+                </div>
+                <div class="swap">⇄</div>
+                <div class="ctrl">
+                  <label>CPU address (hex, bank+offset)</label>
+                  <input type="text" data-xl-addr-in value="C08000" spellcheck="false" aria-label="CPU address">
+                  <span class="val">→ file offset <b data-xl-off-out>—</b></span>
+                </div>
+              </div>
+              <p class="sim-note" data-xl-note>—</p>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>LoROM maps 32 KB of ROM into $8000–$FFFF of each bank; HiROM uses full 64 KB banks for bigger contiguous data.</li>
+              <li>Convert LoROM: bank = offset÷$8000, addr = $8000+(offset mod $8000). HiROM: bank = $C0+(offset÷$10000), addr = offset mod $10000.</li>
+              <li>The ROM is mirrored into several bank ranges; both maps reserve an SRAM window.</li>
+              <li>FastROM is not a different map — it's the same ROM read at 3.58 MHz through the $80–$FF bank image with a speed bit set.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#board"><span class="dir">← Prev</span><span class="ttl">05 · Inside a Game Pak</span></a>
+            <a class="next" href="#save"><span class="dir">Next →</span><span class="ttl">07 · Save RAM &amp; the RTC</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="save">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Save RAM &amp; the real-time clock</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how much save memory a cartridge could carry, where each memory map places it, and how a few games put an actual ticking clock on the board.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 03 explained <em>why</em> saves live in battery-backed SRAM;
+            now the specifics. Save SRAM on the Super&nbsp;Nintendo ranged from a
+            tiny <strong>2&nbsp;Kbit</strong> (256 bytes — enough for a few high
+            scores) up to <strong>256&nbsp;Kbit</strong> (32&nbsp;KB) in the most
+            save-hungry RPGs. The size is declared in the ROM header (Module 13)
+            so the console — and later an emulator — knows how big a save file to
+            keep. Where that SRAM appears in the address space depends on the
+            map: in <strong>LoROM</strong> it typically sits in banks
+            <code>$70–$7D</code> at <code>$0000–$7FFF</code>; in
+            <strong>HiROM</strong> it lives in banks <code>$20–$3F</code> at
+            <code>$6000–$7FFF</code>. Either way it's the <code>/SRAM</code>
+            chip-select window you decoded in Module 02.
+          </p>
+          <p>
+            A handful of games wanted more than persistent bytes — they wanted to
+            know <em>what time it is</em>, even while switched off. For that, a
+            few cartridges carried a real-time clock. Nintendo's
+            <span class="term" data-tip="Nintendo's on-cart real-time clock chip, battery-backed, used by a few games to track date and time across power-offs.">S-RTC</span>
+            appeared in games like <em>Daikaijuu Monogatari II</em>, keeping
+            date and time ticking off the same kind of coin cell that preserves a
+            save. The <span class="term" data-tip="An enhancement chip combining data decompression with a real-time clock, used in a few late Japanese cartridges.">SPC7110</span>
+            (Module 12) also bundled a clock alongside its compression hardware.
+            These are rare — most carts have no sense of time at all — but they
+            show how far the "active cartridge" idea stretched: a Game&nbsp;Pak
+            could quietly count the days in your drawer.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A diary with a wristwatch glued in</span>
+            <p>
+              Battery <span class="term" data-tip="Static RAM kept alive by the cartridge's coin cell.">SRAM</span>
+              is a diary the coin cell keeps from fading. An
+              <span class="term" data-tip="A real-time clock chip on the cartridge, battery-backed, that keeps date and time while the console is off.">RTC</span>
+              cartridge glues a running wristwatch into that same diary: the
+              battery not only preserves what you wrote, it keeps the second hand
+              moving while the book is shut — so when you open it again, it knows
+              how long you were gone.
+            </p>
+          </div>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>SRAM size</th><th>Bytes</th><th>Typical use</th></tr></thead>
+              <tbody>
+                <tr><td><span class="crc">2 Kbit</span></td><td>256 B</td><td>high scores, tiny state</td></tr>
+                <tr><td><span class="crc">16 Kbit</span></td><td>2 KB</td><td>a few save slots</td></tr>
+                <tr><td><span class="crc">64 Kbit</span></td><td>8 KB</td><td>action-RPG saves</td></tr>
+                <tr><td><span class="crc">256 Kbit</span></td><td>32 KB</td><td>large multi-slot RPGs</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The lab lets you pick an SRAM size and a memory map and see exactly
+            where the save window lands in the address space — then toggle an RTC
+            on and watch a live clock the way an S-RTC cartridge would keep it.
+          </p>
+
+          <div class="lab" id="lab-save">
+            <div class="lab-head"><span class="dot"></span><span class="title">Save lab — SRAM window &amp; the clock</span><span class="badge">DOM · explorer</span></div>
+            <div class="lab-body">
+              <div class="controls">
+                <div class="ctrl">
+                  <label>SRAM size — <span class="val" id="save-size-val"></span></label>
+                  <input type="range" min="0" max="4" value="3" step="1" list="save-sizes" data-save-size aria-label="SRAM size">
+                </div>
+                <div class="ctrl">
+                  <label>Memory map</label>
+                  <div class="seg-btns" role="group" aria-label="Memory map">
+                    <button class="on" data-save-map="lorom">LoROM</button>
+                    <button data-save-map="hirom">HiROM</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>On-cart clock</label>
+                  <div class="seg-btns" role="group" aria-label="RTC">
+                    <button class="on" data-save-rtc="off">no RTC</button>
+                    <button data-save-rtc="on">S-RTC</button>
+                  </div>
+                </div>
+              </div>
+              <div class="readouts">
+                <span class="readout">Size <b data-save-bytes>—</b></span>
+                <span class="readout">SRAM window <b data-save-window>—</b></span>
+                <span class="readout">Clock <b data-save-rtcval>—</b></span>
+              </div>
+              <span class="sim-note">The SRAM size the range picks is one of the header-declared values; the window is where that map places the /SRAM select.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Save SRAM ranged from 2 Kbit (256 B) to 256 Kbit (32 KB); the size is declared in the ROM header.</li>
+              <li>LoROM puts SRAM around banks $70–$7D; HiROM around banks $20–$3F at $6000–$7FFF — the /SRAM window.</li>
+              <li>A few cartridges added a battery-backed real-time clock: Nintendo's S-RTC, and the SPC7110's built-in clock.</li>
+              <li>The same coin cell that preserves a save can keep an RTC ticking while the console is off.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#maps"><span class="dir">← Prev</span><span class="ttl">06 · LoROM vs HiROM</span></a>
+            <a class="next" href="#chips"><span class="dir">Next →</span><span class="ttl">08 · The expansion bus</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="chips">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>The expansion bus: enhancement chips</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand why the Game Pak was really an expansion port, and get the lay of the land — a taxonomy of the coprocessor families before we meet them one by one.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is the payoff of Module 04. Because the connector exposes the CPU
+            bus, a cartridge is not limited to storing a game — it can
+            <em>upgrade the console</em>. The Super&nbsp;Nintendo shipped in 1990
+            with a capable-but-aging CPU, and rather than let that ceiling define
+            the library, developers put the extra silicon they needed
+            <strong>on the cartridge</strong>, where the CPU could reach it as
+            plainly as it reaches RAM. Every SNES
+            <span class="term" data-tip="A coprocessor or accelerator carried on the cartridge that adds capability the base console lacks.">enhancement chip</span>
+            is a guest that took the chair Module 04 pulled up to the CPU's desk.
+          </p>
+          <p>
+            They fall into a few families, and the rest of Part&nbsp;II takes each
+            in turn:
+          </p>
+          <ul>
+            <li><strong>Accelerators / coprocessors.</strong> Whole processors that do heavy lifting the CPU can't — the <span class="term" data-tip="The Super FX's RISC processor with pixel-plot hardware; renders polygons into cart RAM.">Super&nbsp;FX (GSU)</span> and the <span class="term" data-tip="A second 65816-family CPU on the cartridge, several times faster than the console's, with its own fast RAM.">SA-1</span> (Modules 09–10).</li>
+            <li><strong>Math / DSP chips.</strong> Fixed-point number crunchers that feed Mode-7 and 3D projection — the NEC <span class="term" data-tip="The NEC µPD77C25 DSP family; the DSP-1 did the matrix and trig math behind Mode 7 perspective and 3D projection.">DSP-1</span> family and Capcom's CX4 (Module 11).</li>
+            <li><strong>Compression / data chips.</strong> Real-time decompressors that let a small ROM hold more apparent art — the <span class="term" data-tip="A real-time graphics decompression chip used in Star Ocean and Street Fighter Alpha 2.">S-DD1</span> and the <span class="term" data-tip="A chip pairing data decompression with a real-time clock.">SPC7110</span> (Module 12).</li>
+            <li><strong>Helpers &amp; oddities.</strong> Small special-purpose parts like the OBC1 sprite helper and the stand-alone S-RTC clock.</li>
+          </ul>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 220" role="img" aria-label="A taxonomy of SNES enhancement chips: accelerators, math/DSP, compression, and helpers">
+              <rect x="30" y="40" width="200" height="150" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="130" y="66" text-anchor="middle" class="d-tag d-violet">Accelerators</text>
+              <text x="130" y="96" text-anchor="middle" class="d-sub">Super FX (GSU)</text>
+              <text x="130" y="118" text-anchor="middle" class="d-sub">SA-1</text>
+              <text x="130" y="150" text-anchor="middle" class="d-sub">full processors</text>
+              <rect x="245" y="40" width="200" height="150" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="345" y="66" text-anchor="middle" class="d-tag d-cyan">Math / DSP</text>
+              <text x="345" y="96" text-anchor="middle" class="d-sub">DSP-1…4 (µPD77C25)</text>
+              <text x="345" y="118" text-anchor="middle" class="d-sub">CX4</text>
+              <text x="345" y="150" text-anchor="middle" class="d-sub">fixed-point crunch</text>
+              <rect x="460" y="40" width="200" height="150" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="560" y="66" text-anchor="middle" class="d-tag d-amber">Compression</text>
+              <text x="560" y="96" text-anchor="middle" class="d-sub">S-DD1</text>
+              <text x="560" y="118" text-anchor="middle" class="d-sub">SPC7110</text>
+              <text x="560" y="150" text-anchor="middle" class="d-sub">unpack on the fly</text>
+              <rect x="675" y="40" width="195" height="150" rx="10" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="772" y="66" text-anchor="middle" class="d-tag d-magenta">Helpers</text>
+              <text x="772" y="96" text-anchor="middle" class="d-sub">OBC1</text>
+              <text x="772" y="118" text-anchor="middle" class="d-sub">S-RTC</text>
+              <text x="772" y="150" text-anchor="middle" class="d-sub">small &amp; specific</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The zoo, sorted.</strong> Four families of on-cart silicon — accelerators, math/DSP, compression, and small helpers — all made possible by the exposed bus. The lab below is a filterable, sortable catalog of them.</figcaption>
+          </figure>
+
+          <p>
+            The lab is that catalog, live. Filter by family, and sort by chip
+            name or clock speed — a bird's-eye view before the deep dives.
+          </p>
+
+          <div class="lab" id="lab-catalog">
+            <div class="lab-head"><span class="dot"></span><span class="title">Chip catalog — filter &amp; sort the zoo</span><span class="badge">DOM · table</span></div>
+            <div class="lab-body">
+              <div class="filter-row">
+                <span class="lbl">Filter</span>
+                <div class="seg-btns wrap" role="group" aria-label="Filter chips">
+                  <button class="on" data-cat-filter="all">all</button>
+                  <button data-cat-filter="accelerator">accelerators</button>
+                  <button data-cat-filter="math">math / DSP</button>
+                  <button data-cat-filter="compression">compression</button>
+                  <button data-cat-filter="other">helpers</button>
+                </div>
+              </div>
+              <div class="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="sortable" data-sort="chip">Chip <span class="ar">▲</span></th>
+                      <th class="sortable" data-sort="cat">Family <span class="ar"></span></th>
+                      <th class="sortable" data-sort="clock">Clock <span class="ar"></span></th>
+                      <th>What it did</th>
+                      <th>Notable games</th>
+                    </tr>
+                  </thead>
+                  <tbody data-cat-body></tbody>
+                </table>
+              </div>
+              <span class="sim-note">Click a column header to sort; click again to reverse. Clocks are the commonly cited figures and vary by source/revision.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The exposed CPU bus turned the cartridge slot into an expansion port: cartridges could upgrade the console itself.</li>
+              <li>Enhancement chips group into accelerators (Super FX, SA-1), math/DSP (DSP-1…4, CX4), compression (S-DD1, SPC7110), and small helpers.</li>
+              <li>The CPU reaches all of them through ordinary reads and writes to their cartridge address windows.</li>
+              <li>The next four modules take one family (and its flagship games) at a time.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#save"><span class="dir">← Prev</span><span class="ttl">07 · Save RAM &amp; the RTC</span></a>
+            <a class="next" href="#superfx"><span class="dir">Next →</span><span class="ttl">09 · The Super FX</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="superfx">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The Super FX</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the most famous enhancement chip — a full RISC coprocessor with pixel-plotting hardware that let a 2D console draw polygons.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The <strong>Super&nbsp;FX</strong> is the chip that put a
+            spaceship-shaped hole in everyone's expectations. Its core, the
+            <span class="term" data-tip="Graphics Support Unit — the RISC processor at the heart of the Super FX, with a small register file and pixel-plot hardware.">GSU</span>
+            (Graphics Support Unit), is a genuine
+            <span class="term" data-tip="Reduced Instruction Set Computing — a processor design with a small set of simple, fast instructions.">RISC</span>
+            processor with its own instruction set, running at about
+            <strong>10.7&nbsp;MHz</strong> in the original revision (the later
+            GSU-2 in <em>Yoshi's Island</em> and <em>Doom</em> effectively ran
+            work through at roughly double that). It isn't a helper the CPU pokes
+            occasionally; it's a co-equal processor that takes over the drawing.
+          </p>
+          <p>
+            Its trick is a <span class="term" data-tip="A Super FX instruction that writes a single pixel into the framebuffer in cart RAM, handling the bitplane arithmetic in hardware.">plot</span>
+            instruction: dedicated hardware that writes one pixel into a
+            framebuffer held in the cartridge's own RAM, doing the fiddly
+            bitplane math the SNES's tile-based picture unit makes painful. The
+            GSU runs a program that transforms and rasterises 3D geometry, plotting
+            it pixel-by-pixel into that cart-RAM framebuffer. When a frame is
+            finished, the main CPU copies (or points the picture unit at) the
+            rendered image and shows it. That division of labour — GSU draws into
+            cart RAM, CPU reads the result — is how <em>Star&nbsp;Fox</em>'s
+            polygon fighters, <em>Stunt&nbsp;Race&nbsp;FX</em>'s cars and
+            <em>Yoshi's Island</em>'s stretchy effects existed on a machine with
+            no 3D hardware of its own.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A sketch artist working in the trunk</span>
+            <p>
+              Picture the CPU as a director who can't draw. Bolted into the
+              cartridge is a fast sketch artist — the
+              <span class="term" data-tip="The Super FX's RISC core.">GSU</span> — with
+              a private sketch pad (the cart-RAM framebuffer). The director shouts
+              the scene; the artist draws it dot by dot on the pad; then the
+              director simply holds the finished pad up to the audience. The
+              console never learned to draw polygons — it learned to
+              <em>display someone else's drawing</em>.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 200" role="img" aria-label="Super FX pipeline: GSU transforms geometry and plots pixels into cart RAM, then the main CPU reads the framebuffer to display it">
+              <defs><marker id="ah09" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <rect x="30" y="60" width="150" height="70" rx="10" class="d-fill-panel d-violet-s" stroke-width="1.5"/>
+              <text x="105" y="90" text-anchor="middle" class="d-label" style="font-size:13px">GSU</text>
+              <text x="105" y="110" text-anchor="middle" class="d-sub">RISC · ~10.7 MHz</text>
+              <line x1="180" y1="95" x2="230" y2="95" class="d-axis" stroke-width="1.6" marker-end="url(#ah09)"/>
+              <text x="205" y="86" text-anchor="middle" class="d-flow d-violet">plot</text>
+              <rect x="232" y="60" width="170" height="70" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="317" y="90" text-anchor="middle" class="d-label" style="font-size:13px">Cart-RAM</text>
+              <text x="317" y="110" text-anchor="middle" class="d-sub">framebuffer</text>
+              <line x1="402" y1="95" x2="452" y2="95" class="d-axis" stroke-width="1.6" marker-end="url(#ah09)"/>
+              <text x="427" y="86" text-anchor="middle" class="d-flow">read</text>
+              <rect x="454" y="60" width="150" height="70" rx="10" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="529" y="90" text-anchor="middle" class="d-label" style="font-size:13px">Main CPU</text>
+              <text x="529" y="110" text-anchor="middle" class="d-sub">shows the frame</text>
+              <rect x="656" y="60" width="180" height="70" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="746" y="90" text-anchor="middle" class="d-label" style="font-size:13px">Screen</text>
+              <text x="746" y="110" text-anchor="middle" class="d-sub">Star Fox, Stunt Race FX</text>
+              <line x1="604" y1="95" x2="654" y2="95" class="d-axis" stroke-width="1.6" marker-end="url(#ah09)"/>
+              <text x="30" y="170" class="d-flow">The GSU does the drawing the SNES can't; the CPU just presents the result. Enhancement, not assistance.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Draw in the trunk, show on stage.</strong> The <span class="term" data-tip="The Super FX RISC core with plot hardware.">GSU</span> plots polygons pixel-by-pixel into a framebuffer in cart RAM; the main CPU reads that buffer back and displays it. The lab plots a rotating wireframe exactly this way.</figcaption>
+          </figure>
+
+          <p>
+            The lab is a miniature GSU. Watch it plot a rotating wireframe object
+            into a small framebuffer <em>one pixel at a time</em> — the plot
+            cursor sweeping each edge — then "hand off" the finished frame before
+            rotating and starting again. Switch between a Rev-1 and a faster Rev-2
+            plot rate and see the frame build quicker.
+          </p>
+
+          <div class="lab" id="lab-superfx">
+            <div class="lab-head"><span class="dot"></span><span class="title">Super FX lab — plot a frame, pixel by pixel</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A framebuffer being filled pixel-by-pixel with a rotating wireframe, then read back by the CPU"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>GSU revision</label>
+                  <div class="seg-btns" role="group" aria-label="GSU revision">
+                    <button class="on" data-fx-rev="1">Rev 1 (~10.7 MHz)</button>
+                    <button data-fx-rev="2">Rev 2 (~21 MHz)</button>
+                  </div>
+                </div>
+                <div class="readouts">
+                  <span class="readout">Pixels plotted <b data-fx-plotted>—</b></span>
+                  <span class="readout">Plot rate <b data-fx-rate>—</b></span>
+                </div>
+                <span class="sim-note">Amber = pixels plotted this instant; cyan = already in the framebuffer. When the frame completes the "CPU reads it," then the object rotates and plotting restarts.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The Super FX's core is the GSU, a real RISC processor (~10.7 MHz; Rev 2 roughly double) living on the cartridge.</li>
+              <li>Its plot hardware writes pixels into a framebuffer in cart RAM, doing the SNES's painful bitplane math in hardware.</li>
+              <li>The GSU renders whole 3D/polygon scenes; the main CPU just reads back and displays the finished frame.</li>
+              <li>Star Fox, Stunt Race FX and Yoshi's Island are the Super FX in action.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#chips"><span class="dir">← Prev</span><span class="ttl">08 · The expansion bus</span></a>
+            <a class="next" href="#sa1"><span class="dir">Next →</span><span class="ttl">10 · The SA-1</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="sa1">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>The SA-1</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the SA-1: a second, faster 65816 on the cartridge with its own fast RAM, used for logic, AI and graphics decompression.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Where the Super&nbsp;FX was an exotic RISC drawing engine, the
+            <strong>SA-1</strong> took a blunter, arguably smarter route: it put a
+            <em>second copy of the console's own CPU</em> on the cartridge — a
+            65816, the same architecture as the SNES's — but clocked at roughly
+            <strong>10.7&nbsp;MHz</strong>, about three times the main CPU's
+            typical speed, and paired with its own fast on-cart RAM. Because it
+            speaks the same instruction set, developers already knew how to
+            program it; they simply handed it the heaviest work.
+          </p>
+          <p>
+            That work was rarely polygons. The SA-1 shone at <em>logic</em>: game
+            AI, physics, the bookkeeping of a big turn-based battle, and fast
+            <strong>graphics decompression</strong> — unpacking compressed art
+            into RAM far quicker than the main CPU could. <em>Super&nbsp;Mario&nbsp;RPG</em>
+            leaned on it, and the <em>Kirby</em> titles
+            (<em>Kirby&nbsp;Super&nbsp;Star</em>, <em>Kirby's&nbsp;Dream&nbsp;Land&nbsp;3</em>)
+            used its muscle to keep dense action moving. Beyond raw clock speed
+            the SA-1 also included conveniences — a fast built-in multiplier and
+            divider, a bank-switching memory controller, and its own DMA — so a
+            lot of small operations that were slow on the base CPU became cheap.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Hiring your own clone, but faster</span>
+            <p>
+              Imagine you could hire an assistant who is <em>you</em> — same
+              skills, same habits, nothing new to teach — but who thinks three
+              times as fast and has their own tidy desk. You'd offload your
+              busywork instantly, because there's no translation cost. The
+              <span class="term" data-tip="A second 65816-family CPU on the cartridge, clocked ~10.7 MHz with its own fast RAM.">SA-1</span>
+              was exactly that: the SNES's CPU again, quicker, right there in the
+              cartridge.
+            </p>
+          </div>
+
+          <div class="specs">
+            <div class="spec"><div class="k">Core</div><div class="v">65816</div><div class="d">same as the SNES CPU</div></div>
+            <div class="spec"><div class="k">Clock</div><div class="v">~10.7<small> MHz</small></div><div class="d">≈3× the main CPU</div></div>
+            <div class="spec"><div class="k">Extras</div><div class="v">mul/div</div><div class="d">fast math, DMA, banks</div></div>
+            <div class="spec"><div class="k">Best at</div><div class="v">logic</div><div class="d">AI, decompression</div></div>
+          </div>
+
+          <p>
+            The lab races the same workload on both processors: the main CPU at
+            its ~3.58&nbsp;MHz against the SA-1 at ~10.7&nbsp;MHz. Press
+            <strong>Run</strong> and watch the SA-1's bar pull decisively ahead —
+            roughly the throughput multiple that let these games do more per
+            frame.
+          </p>
+
+          <div class="lab" id="lab-sa1">
+            <div class="lab-head"><span class="dot"></span><span class="title">SA-1 lab — race the same job</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-mid" aria-label="Two progress bars racing: the main CPU versus the faster SA-1 on the same workload"></canvas>
+              <div class="controls">
+                <button class="play-btn" data-sa1-run>Run</button>
+                <div class="readouts">
+                  <span class="readout">Main CPU <b data-sa1-main>—</b></span>
+                  <span class="readout">SA-1 <b data-sa1-sa1>—</b></span>
+                  <span class="readout good">Speedup <b data-sa1-speed>—</b></span>
+                </div>
+                <span class="sim-note">A toy workload, paced purely by clock ratio. Real speedups also depend on the SA-1's fast math, DMA and RAM — often more than 3×.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The SA-1 is a second 65816 — the console's own CPU architecture — on the cartridge, clocked ~10.7 MHz with its own fast RAM.</li>
+              <li>It targeted logic, AI and graphics decompression rather than polygon drawing.</li>
+              <li>Built-in fast multiply/divide, DMA and a memory controller made many small operations cheap.</li>
+              <li>Super Mario RPG, Kirby Super Star and Kirby's Dream Land 3 are showcases.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#superfx"><span class="dir">← Prev</span><span class="ttl">09 · The Super FX</span></a>
+            <a class="next" href="#dsp"><span class="dir">Next →</span><span class="ttl">11 · The DSP &amp; math chips</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="dsp">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>The DSP &amp; math chips</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the NEC DSP family and Capcom's CX4 did the fixed-point matrix and trig math that fed Mode-7 perspective and 3D projection.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Not every problem needs a whole second CPU — sometimes you just need
+            arithmetic the base processor is bad at. The 65816 has no fast
+            floating-point and only modest multiply support, yet 3D and
+            perspective effects are <em>drowning</em> in multiplications: to
+            rotate and project a point you multiply it by a matrix, over and over,
+            thousands of times a frame. The answer was a
+            <span class="term" data-tip="Digital Signal Processor — a chip specialised for fast, repetitive fixed-point arithmetic like multiply-accumulate.">DSP</span>:
+            a chip built to do exactly that repetitive fixed-point math at speed.
+          </p>
+          <p>
+            The workhorse was the NEC
+            <span class="term" data-tip="The NEC DSP core used on SNES cartridges; the DSP-1 configuration ran the matrix/vector/trig math for Mode 7 and 3D.">µPD77C25</span>
+            family, whose most common configuration on SNES cartridges was the
+            <strong>DSP-1</strong>. It appeared in <em>Pilotwings</em>,
+            <em>Super&nbsp;Mario&nbsp;Kart</em> and many others, doing the matrix,
+            vector and trigonometric calculations that drove
+            <span class="term" data-tip="A SNES graphics mode that scales and rotates a single background layer, used for pseudo-3D ground planes.">Mode&nbsp;7</span>
+            perspective and 3D projection — the CPU fed it coordinates and read
+            back screen positions. Variants followed (DSP-2, DSP-3, DSP-4) for
+            other games' needs, and later NEC-core parts (the ST010/ST011) pushed
+            the same idea further. Capcom rolled its own math chip, the
+            <span class="term" data-tip="Capcom's cartridge math chip; did trig and wireframe transforms for the Mega Man X sequels.">CX4</span>,
+            to do trig and wireframe transforms for the vector effects in
+            <em>Mega&nbsp;Man&nbsp;X2</em> and <em>X3</em>.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A pocket calculator for the CPU</span>
+            <p>
+              The 65816 doing 3D math by hand is a clerk multiplying long numbers
+              on paper — accurate but slow. The
+              <span class="term" data-tip="A math coprocessor specialised in fast fixed-point multiply-accumulate.">DSP</span>
+              is a calculator on the clerk's desk: hand it the matrix and the
+              point, and the answer comes back before the clerk could have written
+              the first partial product. The clerk still runs the office; the
+              calculator just makes the numbers instant.
+            </p>
+          </div>
+
+          <p>
+            The lab is a DSP-1 in spirit: it takes a set of 3D points and projects
+            them to 2D through a fixed-point rotation matrix — the same kind of
+            transform the chip performed — and shows you both the spinning result
+            and the live matrix values feeding it. Drag the sliders to steer, and
+            watch the matrix change.
+          </p>
+
+          <div class="lab" id="lab-dsp">
+            <div class="lab-head"><span class="dot"></span><span class="title">DSP lab — project 3D points with a matrix</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A rotating 3D wireframe projected to 2D, with the live rotation matrix shown alongside"></canvas>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Yaw</label>
+                  <input type="range" min="0" max="628" value="60" step="2" data-dsp-yaw aria-label="Yaw">
+                </div>
+                <div class="ctrl">
+                  <label>Pitch</label>
+                  <input type="range" min="-100" max="100" value="50" step="2" data-dsp-pitch aria-label="Pitch">
+                </div>
+                <div class="readouts">
+                  <span class="readout">Angles <b data-dsp-matrix>—</b></span>
+                </div>
+                <span class="sim-note">Each screen point is matrix × vector, in fixed-point — exactly the arithmetic the DSP-1 fired off thousands of times per frame.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>3D and perspective are dominated by repeated fixed-point multiplies — work the 65816 is slow at.</li>
+              <li>The NEC µPD77C25 (as DSP-1) did the matrix/vector/trig math for Mode 7 and 3D in Pilotwings, Super Mario Kart and more.</li>
+              <li>DSP-2/3/4 and later NEC parts handled other games' math; Capcom's CX4 did trig/wireframe for Mega Man X2/X3.</li>
+              <li>The CPU feeds coordinates and reads back projected results — the DSP is a calculator bolted to the bus.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#sa1"><span class="dir">← Prev</span><span class="ttl">10 · The SA-1</span></a>
+            <a class="next" href="#exotic"><span class="dir">Next →</span><span class="ttl">12 · Exotic chips</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="exotic">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>Exotic chips: compression &amp; more</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the compression chips (S-DD1, SPC7110) and the remaining oddities (CX4, OBC1), and watch a decompressor unpack graphics on the cartridge.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            ROM was expensive, and by the mid-90s games wanted more art than a
+            reasonably-priced ROM could hold. One answer, seen in the SA-1 games,
+            was to <em>compress</em> the art and unpack it on load. But a couple
+            of cartridges went further and decompressed graphics
+            <strong>in real time</strong>, as the console demanded them — so the
+            ROM only ever stored the squeezed version, and the full-size art
+            existed only for the instant it was needed.
+          </p>
+          <p>
+            The star is the <span class="term" data-tip="A real-time graphics decompression chip; the ROM holds compressed art and the chip expands it on demand.">S-DD1</span>,
+            used in <em>Star&nbsp;Ocean</em> and <em>Street&nbsp;Fighter&nbsp;Alpha&nbsp;2</em>:
+            games so art-heavy they'd have needed implausibly large ROMs
+            uncompressed. The <span class="term" data-tip="A chip pairing data decompression with a real-time clock, used in a few late Japanese titles.">SPC7110</span>
+            did a similar decompression job and, as noted in Module 07, bundled a
+            real-time clock. Rounding out the zoo: Capcom's
+            <span class="term" data-tip="Capcom's math chip for trig and wireframe effects in the Mega Man X sequels.">CX4</span>
+            (trig/wireframe, from Module 11), the <span class="term" data-tip="A small helper chip that managed sprite/OAM data for a couple of games.">OBC1</span>
+            sprite helper, and a long tail of one-off and licensed parts. The
+            common thread is the same as ever: because the chip sits on the CPU
+            bus, the console fetches "graphics" and the cartridge quietly
+            manufactures them.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 190" role="img" aria-label="A decompression chip: the ROM stores compressed tokens, the chip expands them into full graphics the CPU reads">
+              <defs><marker id="ah12" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker></defs>
+              <rect x="30" y="55" width="170" height="70" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="115" y="85" text-anchor="middle" class="d-label" style="font-size:12px">Compressed ROM</text>
+              <text x="115" y="105" text-anchor="middle" class="d-sub">small · tokens</text>
+              <line x1="200" y1="90" x2="250" y2="90" class="d-axis" stroke-width="1.6" marker-end="url(#ah12)"/>
+              <rect x="252" y="55" width="170" height="70" rx="10" class="d-fill-panel d-amber-s" stroke-width="1.5"/>
+              <text x="337" y="85" text-anchor="middle" class="d-label d-amber" style="font-size:12px">S-DD1</text>
+              <text x="337" y="105" text-anchor="middle" class="d-sub">unpack on the fly</text>
+              <line x1="422" y1="90" x2="472" y2="90" class="d-axis" stroke-width="1.6" marker-end="url(#ah12)"/>
+              <rect x="474" y="55" width="180" height="70" rx="10" class="d-fill-panel d-magenta-s" stroke-width="1.5"/>
+              <text x="564" y="85" text-anchor="middle" class="d-label" style="font-size:12px">Full graphics</text>
+              <text x="564" y="105" text-anchor="middle" class="d-sub">into RAM / PPU</text>
+              <line x1="654" y1="90" x2="704" y2="90" class="d-axis" stroke-width="1.6" marker-end="url(#ah12)"/>
+              <rect x="706" y="55" width="160" height="70" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="786" y="85" text-anchor="middle" class="d-label" style="font-size:12px">CPU reads</text>
+              <text x="786" y="105" text-anchor="middle" class="d-sub">as if it were there</text>
+              <text x="30" y="165" class="d-flow">The ROM only ever stores the squeezed art; the full-size version exists just long enough to be used.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>Manufacturing graphics on demand.</strong> A decompressor like the <span class="term" data-tip="Real-time graphics decompression chip in Star Ocean and SF Alpha 2.">S-DD1</span> lets the ROM hold only compressed data; the chip expands it as the console reads, so a modest ROM behaves like a much larger one.</figcaption>
+          </figure>
+
+          <p>
+            The lab is a decompressor in that spirit. A short stream of
+            compression tokens — literals and back-references, the bones of any
+            LZ/RLE scheme — is unpacked "on the cart" into a small graphic,
+            byte-by-byte, so you can watch a tiny compressed input bloom into a
+            full tile and see the compression ratio it bought.
+          </p>
+
+          <div class="lab" id="lab-decomp">
+            <div class="lab-head"><span class="dot"></span><span class="title">Decompression lab — unpack graphics on the cart</span><span class="badge">Canvas · simulation</span></div>
+            <div class="lab-body">
+              <canvas class="scope lab-tall" aria-label="A token stream being decoded into a small graphic pixel by pixel, with the compression ratio shown"></canvas>
+              <div class="controls">
+                <button class="reset-btn" data-dec-reset>Replay</button>
+                <div class="readouts">
+                  <span class="readout good">Ratio <b data-dec-ratio>—</b></span>
+                  <span class="readout">Output <b data-dec-out>—</b></span>
+                </div>
+                <span class="sim-note">"LIT" writes a run of pixels; "COPY" repeats an earlier run (a back-reference) — the two moves at the heart of LZ-style compression the S-DD1 did in hardware.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Some cartridges decompressed graphics in real time so the ROM only stored the compressed version.</li>
+              <li>The S-DD1 (Star Ocean, SF Alpha 2) is the flagship real-time decompressor; the SPC7110 combined compression with an RTC.</li>
+              <li>Capcom's CX4 (trig/wireframe) and the OBC1 sprite helper round out the family, alongside many one-off parts.</li>
+              <li>As always, it works because the chip sits on the CPU bus: the console reads "graphics," the cartridge makes them.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#dsp"><span class="dir">← Prev</span><span class="ttl">11 · The DSP &amp; math chips</span></a>
+            <a class="next" href="#emulate"><span class="dir">Next → Part III</span><span class="ttl">13 · ROM images &amp; headers</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating in bsnes</h3>
+          <p>
+            Every cartridge in this course now lives, for most people, as a file:
+            a <em>ROM image</em> read by an emulator. The final module follows the
+            Game&nbsp;Pak into software — the dump, the internal header that names
+            the game and declares its mapping and chips, the pesky 512-byte copier
+            header, and how a cycle-accurate emulator like bsnes identifies the
+            mapping and re-creates each coprocessor. One module, one lab, and a
+            callback to where we began.
+          </p>
+          <div class="part-meta"><span>Module <b>13</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>1 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="emulate">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>ROM images, headers &amp; co-processors</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Read a SNES ROM the way an emulator does: the internal header (map mode, chipset, sizes, checksum), the SMC copier header, and how the mapping and chips get identified and emulated.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A <span class="term" data-tip="A byte-for-byte copy of a cartridge's mask ROM, stored as a file.">ROM image</span>
+            is just the mask ROM's bytes in a file — a
+            <span class="term" data-tip="Reading every byte out of the cartridge's ROM to make a faithful copy.">dump</span>.
+            But a bare pile of bytes doesn't say whether it's LoROM or HiROM,
+            whether there's a Super&nbsp;FX or an SA-1 aboard, or how big the save
+            is. Almost all of that is answered by a small
+            <span class="term" data-tip="A fixed region near the top of bank $00 holding the game's name, map mode, chipset byte, ROM/RAM sizes, region and checksum.">internal header</span>
+            the SNES itself reads at boot, sitting near the top of the first bank:
+            around <code>$FFC0</code> in a LoROM image (and near
+            <code>$FFB0</code>/<code>$FFD0</code> for HiROM, because the header
+            lands at a different file offset when whole banks are used).
+          </p>
+          <p>
+            Walk the key bytes. At <code>$FFC0</code> is the 21-character
+            <strong>title</strong>. At <code>$FFD5</code> the
+            <span class="term" data-tip="The header byte that encodes LoROM/HiROM/ExHiROM and whether FastROM timing is used.">map mode</span>
+            byte (e.g. <code>$20</code> LoROM, <code>$21</code> HiROM,
+            <code>$23</code> for an SA-1 layout; bit&nbsp;4 flags FastROM). At
+            <code>$FFD6</code> the <span class="term" data-tip="The header byte encoding whether the cart has RAM, a battery, and which coprocessor (DSP, GSU, SA-1, S-DD1…).">chipset</span>
+            byte, whose nibbles say whether there's RAM, a battery and which
+            coprocessor. Then <strong>ROM size</strong> (<code>$FFD7</code>) and
+            <strong>RAM size</strong> (<code>$FFD8</code>) as power-of-two codes,
+            the <strong>region</strong> (<code>$FFD9</code>, which also implies
+            NTSC vs PAL), and a <strong>checksum</strong> at <code>$FFDE</code>
+            with its complement at <code>$FFDC</code> — the two should XOR to
+            <code>$FFFF</code>, a quick sanity check the emulator uses to help
+            locate the header in the first place.
+          </p>
+          <p>
+            One wrinkle from the dumping era: some files carry an extra
+            <span class="term" data-tip="A 512-byte header prepended by old copier devices (SMC and friends). It shifts every offset by $200 and must be detected and skipped.">SMC/copier header</span>,
+            512 bytes bolted onto the very front by old backup devices. It shifts
+            every offset by <code>$200</code>, so an emulator detects it simply —
+            if the file size divided by 32&nbsp;KB leaves a remainder of 512,
+            there's a copier header to skip. To decide LoROM vs HiROM and spot
+            coprocessors, bsnes uses a mix of a
+            <span class="term" data-tip="A curated database (and text manifest) that maps known ROMs to their exact hardware, more reliable than header heuristics alone.">manifest/database</span>
+            and header heuristics — the internal header is a good hint, but real
+            dumps have enough quirks that a known-good database is the trustworthy
+            source. Then it emulates each coprocessor: the Super&nbsp;FX and SA-1
+            as full CPU cores, the DSP-1 by running its actual microcode, each with
+            careful cycle timing so the game can't tell it left the cartridge.
+          </p>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 200" role="img" aria-label="The SNES internal header fields near $FFC0 and the optional 512-byte SMC copier header at the front of a file">
+              <rect x="30" y="46" width="70" height="50" rx="6" fill="rgba(135,127,158,0.16)" class="d-stroke-line" stroke-width="1"/>
+              <text x="65" y="68" text-anchor="middle" class="d-sub">SMC</text>
+              <text x="65" y="84" text-anchor="middle" class="d-sub" style="font-size:9px">+512 (maybe)</text>
+              <line x1="100" y1="71" x2="140" y2="71" class="d-axis" stroke-width="1.4"/>
+              <rect x="142" y="40" width="120" height="62" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="202" y="66" text-anchor="middle" class="d-sub">title $FFC0</text>
+              <text x="202" y="84" text-anchor="middle" class="d-sub" style="font-size:9px">21 chars</text>
+              <rect x="266" y="40" width="90" height="62" rx="6" fill="rgba(255,177,78,0.14)" class="d-amber-s" stroke-width="1.4"/>
+              <text x="311" y="66" text-anchor="middle" class="d-sub d-amber">map $FFD5</text>
+              <rect x="360" y="40" width="90" height="62" rx="6" fill="rgba(255,95,158,0.14)" class="d-magenta-s" stroke-width="1.4"/>
+              <text x="405" y="66" text-anchor="middle" class="d-sub d-magenta">chip $FFD6</text>
+              <rect x="454" y="40" width="120" height="62" rx="6" fill="rgba(168,132,255,0.14)" class="d-violet-s" stroke-width="1.4"/>
+              <text x="514" y="66" text-anchor="middle" class="d-sub d-violet">ROM/RAM size</text>
+              <text x="514" y="84" text-anchor="middle" class="d-sub" style="font-size:9px">$FFD7 · $FFD8</text>
+              <rect x="578" y="40" width="90" height="62" rx="6" class="d-fill-panel d-stroke-line" stroke-width="1.4"/>
+              <text x="623" y="66" text-anchor="middle" class="d-sub">region $FFD9</text>
+              <rect x="672" y="40" width="160" height="62" rx="6" class="d-fill-panel d-cyan-s" stroke-width="1.4"/>
+              <text x="752" y="66" text-anchor="middle" class="d-sub d-cyan">checksum $FFDE</text>
+              <text x="752" y="84" text-anchor="middle" class="d-sub" style="font-size:9px">+ complement $FFDC</text>
+              <text x="30" y="140" class="d-flow">Emulator: skip any SMC header → read these bytes → pick LoROM/HiROM &amp; coprocessor (with a database to be sure).</text>
+              <text x="30" y="168" class="d-flow">checksum XOR complement should equal $FFFF — a fast way to confirm the header was found.</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The header, byte by byte.</strong> Skip the optional 512-byte <span class="term" data-tip="A copier header prepended to some dumps; shifts offsets by $200.">SMC header</span>, read the title, <span class="term" data-tip="LoROM/HiROM + FastROM flag.">map mode</span>, <span class="term" data-tip="RAM/battery/coprocessor byte.">chipset</span>, sizes, region and checksum, and you know how to map and emulate the cart.</figcaption>
+          </figure>
+
+          <p>
+            The lab is a header parser. Load one of several sample cartridges —
+            each with a realistic map/chipset/size/region — and watch it decode
+            into readable fields, with the raw header bytes shown and the
+            map/chipset/size bytes highlighted. Toggle a copier header on to see
+            the note appear.
+          </p>
+
+          <div class="lab" id="lab-header">
+            <div class="lab-head"><span class="dot"></span><span class="title">Header lab — decode a ROM's internal header</span><span class="badge">DOM · parser</span></div>
+            <div class="lab-body">
+              <div class="filter-row">
+                <span class="lbl">Sample</span>
+                <div class="seg-btns wrap" role="group" aria-label="Sample cartridge">
+                  <button class="on" data-hdr-sample="smw">SMW (LoROM)</button>
+                  <button data-hdr-sample="zelda">Zelda (LoROM+batt)</button>
+                  <button data-hdr-sample="starfox">Star Fox (Super FX)</button>
+                  <button data-hdr-sample="mariorpg">Mario RPG (SA-1)</button>
+                  <button data-hdr-sample="pilotwings">Pilotwings (DSP-1)</button>
+                </div>
+              </div>
+              <div class="filter-row">
+                <span class="lbl">Copier header</span>
+                <div class="seg-btns" role="group" aria-label="SMC header">
+                  <button class="on" data-hdr-smc="off">bare ROM</button>
+                  <button data-hdr-smc="on">+512 SMC</button>
+                </div>
+              </div>
+              <div class="hdr-grid" data-hdr-grid></div>
+              <div class="hexstrip" data-hdr-strip></div>
+              <span class="sim-note">Header bytes are realistic per sample; the checksum here is synthetic (we ship no ROM) but its complement relationship is shown the way a real check works.</span>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>A ROM image is the mask ROM's bytes; its internal header (~$FFC0) declares title, map mode, chipset, ROM/RAM sizes, region and checksum.</li>
+              <li>The map byte picks LoROM/HiROM/FastROM; the chipset byte's nibbles reveal RAM, battery and which coprocessor — DSP, GSU, SA-1, S-DD1…</li>
+              <li>A 512-byte SMC/copier header shifts every offset by $200; detect it from a file-size remainder and skip it. bsnes leans on a database plus heuristics.</li>
+              <li>And it all closes the loop on Module 01: an emulator's whole job is to answer "address in, data out" for this ROM — and now to be a Super FX, an SA-1 or a DSP-1 exactly when the header says so.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#exotic"><span class="dir">← Prev</span><span class="ttl">12 · Exotic chips</span></a>
+            <a class="next" href="#rom"><span class="dir">↺ Restart</span><span class="ttl">01 · ROM vs RAM</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course on the Super Nintendo Game Pak. Every ROM,
+          board and chip on this page is a synthetic simulation drawn on the fly
+          with the Canvas API to illustrate a concept. This page contains
+          <strong>no game data and no copyrighted material</strong>. Hardware
+          behaviour is grounded in the SNES development community's
+          reverse-engineering record and emulator sources; where a figure varies
+          by source or chip revision (coprocessor clocks, exact SRAM windows),
+          the text says so and hedges.
+        </p>
+        <p class="src">
+          Reference points · internal header near <code>$FFC0</code> (LoROM) /
+          <code>$FFB0</code>+<code>$FFD0</code> (HiROM) · enhancement chips:
+          GSU, SA-1, µPD77C25, S-DD1, SPC7110, CX4
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<datalist id="save-sizes"></datalist>
+<script src="app.js"></script>
+</body>
+</html>

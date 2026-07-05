@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super NES CPU — a course on the 65816 &amp; the Ricoh 5A22</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%237d5cf0%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%276%27 fill=%27none%27 stroke=%27%230c0a13%27 stroke-width=%273%27/%3E%3C/svg%3E">
+<meta name="description" content="A hands-on course in three parts: how a CPU works from absolute zero, what makes the Super Nintendo's Ricoh 5A22 — a 65816 core plus Nintendo's on-die DMA, HDMA and math hardware — tick, and how bsnes emulates it cycle-for-cycle. Every module has an interactive lab you can run in your browser.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+<button class="menu-btn" id="menu-btn" aria-label="Open contents">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+
+  <!-- ================================================= SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Super NES CPU</h1>
+        <span class="sub">A course · 15 modules</span>
+      </div>
+    </div>
+
+    <nav class="toc" aria-label="Course contents">
+      <div class="toc-group">Part I · How CPUs work</div>
+      <a href="#loop"><span class="n">01</span><span>The fetch–decode–execute loop</span></a>
+      <a href="#registers"><span class="n">02</span><span>Registers, memory &amp; the ISA</span></a>
+      <a href="#numbers"><span class="n">03</span><span>Numbers in silicon</span></a>
+      <a href="#addressing"><span class="n">04</span><span>Addressing modes</span></a>
+      <a href="#stack"><span class="n">05</span><span>The stack &amp; subroutines</span></a>
+      <a href="#interrupts"><span class="n">06</span><span>Interrupts &amp; timing</span></a>
+
+      <div class="toc-group">Part II · The 5A22</div>
+      <a href="#a22"><span class="n">07</span><span>Meet the 5A22</span></a>
+      <a href="#width"><span class="n">08</span><span>8-bit or 16-bit? M &amp; X</span></a>
+      <a href="#banks"><span class="n">09</span><span>The 24-bit address space</span></a>
+      <a href="#dma"><span class="n">10</span><span>DMA — feeding the PPU</span></a>
+      <a href="#hdma"><span class="n">11</span><span>HDMA — mid-frame magic</span></a>
+      <a href="#math"><span class="n">12</span><span>The math registers</span></a>
+
+      <div class="toc-group">Part III · Emulating in bsnes</div>
+      <a href="#interp"><span class="n">13</span><span>Interpreters &amp; cycle accuracy</span></a>
+      <a href="#accuracy"><span class="n">14</span><span>The accuracy traps</span></a>
+      <a href="#try"><span class="n">15</span><span>Try it in bsnes / Mesen</span></a>
+
+      <div class="progress-note">Progress · <b id="pct">0%</b></div>
+    </nav>
+  </aside>
+
+  <!-- ================================================= MAIN =============== -->
+  <main class="main">
+
+    <!-- ------------------------------------------------ HERO -------------- -->
+    <header class="hero">
+      <canvas id="hero-pipe" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="inner">
+          <span class="eyebrow">An interactive course · bsnes &amp; the 65816</span>
+          <h2>How the <span class="grad">Super Nintendo</span> thought.</h2>
+          <p class="lede">
+            We start from the very beginning — what a processor even
+            <em>is</em> — assuming you know nothing about computer architecture.
+            Once the vocabulary is solid, we meet the <strong>Ricoh 5A22</strong>:
+            a 16-bit <strong>65816</strong> core wrapped in Nintendo's own DMA,
+            HDMA and math hardware. We finish inside <strong>bsnes</strong>,
+            where a single master clock keeps the whole console honest. Fifteen
+            modules, each with a <strong>live, clickable machine</strong> so you
+            can watch every idea run, not just read about it. No game code ships
+            with this page; every simulation is built in your browser.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#loop">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Begin Part I
+            </a>
+            <a class="btn" href="#lab-toycpu">Step the toy CPU</a>
+          </div>
+
+          <div class="arc-cards">
+            <a class="arc" href="#part-1">
+              <div class="an">PART I</div>
+              <h4>How CPUs work</h4>
+              <p>Instructions, registers, binary and two's complement, addressing modes, the stack, interrupts and clocks — the universal vocabulary of processors, explained from zero.</p>
+              <div class="cnt">6 modules · 5 labs</div>
+            </a>
+            <a class="arc" href="#part-2">
+              <div class="an">PART II</div>
+              <h4>The 5A22</h4>
+              <p>The chip itself: the 8/16-bit M &amp; X flags, the 24-bit banked address space, DMA and HDMA, and the hardware multiply/divide unit.</p>
+              <div class="cnt">6 modules · 5 labs</div>
+            </a>
+            <a class="arc" href="#part-3">
+              <div class="an">PART III</div>
+              <h4>Emulating in bsnes</h4>
+              <p>How a single shared clock runs the CPU, the accuracy traps that make it hard, and the debuggers where you can see it all.</p>
+              <div class="cnt">3 modules</div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+
+      <!-- ============================================ PART I ============== -->
+      <section class="part" id="part-1">
+        <div class="part-inner">
+          <div class="kicker">Part I</div>
+          <h3>How CPUs work</h3>
+          <p>
+            This first part is pure fundamentals — nothing about any specific
+            console or chip yet. It's the toolkit <em>every</em> processor is
+            built from, whether that's your phone, your laptop, or the chip
+            we'll meet in Part II. We build the vocabulary one word at a time —
+            instruction, register, addressing mode, stack, interrupt — and you
+            can step and run each idea in a tiny simulated machine. If a term is
+            ever used before it's explained, that's a bug; tell us. Everything
+            in Parts II and III is just these six ideas wired together.
+          </p>
+          <div class="part-meta"><span>Modules <b>01–06</b></span><span>Difficulty <b>Absolute beginner</b></span><span>Labs <b>5 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 01 --- -->
+      <section class="doc" id="loop">
+        <div class="mod-head">
+          <span class="eye">Module 01 <span class="part-tag">· Part I</span></span>
+          <h3>The fetch–decode–execute loop</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand, from scratch, what a processor actually does: fetch a number from memory, work out what it means, do it — forever.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Let's start with what a processor physically is. Strip away the
+            marketing and a CPU is a machine that repeats one tiny ritual,
+            millions of times per second, without ever getting bored. The
+            ritual has three steps: <strong>fetch</strong> a number from
+            memory, <strong>decode</strong> it — work out what command that
+            number stands for — and <strong>execute</strong> it. Then do the
+            next one. That's the whole job. Everything a Super Nintendo ever did
+            — every Mode 7 castle, every Chrono Trigger battle, every pixel —
+            is that loop, running fast.
+          </p>
+          <p>
+            Two words in that ritual need unpacking. <strong>Memory</strong> is
+            a long row of numbered pigeonholes, each holding one small number (a
+            <span class="term" data-tip="Eight bits — the smallest chunk of memory a CPU normally addresses. One byte holds a number from 0 to 255.">byte</span>).
+            The pigeonhole's position in the row is its
+            <strong>address</strong> — cell 0, cell 1, cell 2, and so on. And an
+            <strong>instruction</strong> is just one of those stored numbers
+            that the CPU has agreed to treat as a command. There is nothing
+            special about the number itself: <code>$A9</code> sitting in memory
+            might mean &ldquo;load the accumulator&rdquo; to the processor, or it
+            might just be the number 169 in someone's data. Position and
+            convention decide, nothing else. Programs and data live in the same
+            memory, side by side — this is the single most important idea in
+            all of computing, and (in Module 14) it's also what makes emulators
+            sweat.
+          </p>
+          <p>
+            So how does the CPU know <em>which</em> cell holds its next
+            command? It keeps a bookmark: a counter called the
+            <strong>program counter</strong> (<span class="term" data-tip="The register holding the memory address of the next instruction to run. It normally steps forward one instruction at a time; a branch or jump rewrites it.">PC</span>).
+            Each trip round the loop it fetches the instruction the PC points
+            at, then bumps the PC forward so the next trip fetches the next
+            cell. The exception is a <strong>branch</strong> or <strong>jump</strong>:
+            an instruction whose whole job is to overwrite the PC with a new
+            address, so execution leaps somewhere else. Branches are how
+            programs make decisions and loops.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A cook with recipe cards</span>
+            <p>
+              Picture a cook working from a stack of numbered recipe cards, one
+              short command per card: &ldquo;fetch the flour&rdquo;, &ldquo;add
+              two eggs&rdquo;, &ldquo;go back to card 3&rdquo;. The cook keeps a
+              finger on the current card — that finger is the
+              <span class="term" data-tip="The register holding the address of the next instruction — the CPU's bookmark into memory.">program counter</span>.
+              Read a card, do what it says, slide the finger to the next card.
+              The cook never sees the &ldquo;whole recipe&rdquo;; only ever one
+              card at a time. A CPU is exactly this cook — just one who reads a
+              couple of million cards a second and never misreads one.
+            </p>
+          </div>
+
+          <figure class="figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="The fetch, decode, execute cycle reading instructions from memory">
+              <defs><marker id="m1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="m1c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker></defs>
+              <rect x="40" y="40" width="180" height="220" rx="10" class="d-fill-panel2 d-stroke-line" stroke-width="1.5"/>
+              <text x="130" y="30" text-anchor="middle" class="d-tag">Memory</text>
+              <rect x="56" y="56"  width="148" height="30" rx="5" class="d-cell"/><text x="70" y="76" class="d-num">0 · $A9</text><text x="196" y="76" text-anchor="end" class="d-sub">LDA</text>
+              <rect x="56" y="92"  width="148" height="30" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.4"/><text x="70" y="112" class="d-num">1 · $6D</text><text x="196" y="112" text-anchor="end" class="d-sub">ADC</text>
+              <rect x="56" y="128" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="148" class="d-num">2 · $8D</text><text x="196" y="148" text-anchor="end" class="d-sub">STA</text>
+              <rect x="56" y="164" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="184" class="d-num">3 · $4C</text><text x="196" y="184" text-anchor="end" class="d-sub">JMP</text>
+              <rect x="56" y="200" width="148" height="30" rx="5" class="d-cell"/><text x="70" y="220" class="d-num">…</text><text x="196" y="220" text-anchor="end" class="d-sub">data</text>
+              <rect x="40" y="272" width="180" height="20" rx="5" class="d-fill-panel d-violet-s" stroke-width="1.2"/>
+              <text x="130" y="286" text-anchor="middle" class="d-sub d-violet">PC = 1  (the bookmark)</text>
+              <rect x="330" y="46" width="190" height="64" rx="10" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="425" y="74" text-anchor="middle" class="d-label" style="font-size:14px">1 · Fetch</text>
+              <text x="425" y="94" text-anchor="middle" class="d-sub">read the cell PC points at</text>
+              <rect x="620" y="46" width="190" height="64" rx="10" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="715" y="74" text-anchor="middle" class="d-label" style="font-size:14px">2 · Decode</text>
+              <text x="715" y="94" text-anchor="middle" class="d-sub">$6D → &ldquo;add from memory&rdquo;</text>
+              <rect x="475" y="190" width="190" height="64" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="570" y="218" text-anchor="middle" class="d-label" style="font-size:14px">3 · Execute</text>
+              <text x="570" y="238" text-anchor="middle" class="d-sub">do it, then advance PC</text>
+              <line x1="520" y1="78" x2="616" y2="78" class="d-axis" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <path d="M 715 110 C 715 160, 690 190, 668 202" fill="none" stroke="#877f9e" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <path d="M 472 222 C 400 210, 390 150, 415 114" fill="none" stroke="#877f9e" stroke-width="1.8" marker-end="url(#m1a)"/>
+              <text x="415" y="168" class="d-flow">repeat, forever</text>
+              <path d="M 204 107 C 260 107, 270 82, 326 80" fill="none" stroke="#45e4d1" stroke-width="1.8" marker-end="url(#m1c)"/>
+              <text x="236" y="70" class="d-flow d-cyan">instruction = a number</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>The loop that runs the world.</strong> Instructions are ordinary numbers stored in memory. The <span class="term" data-tip="The register holding the address of the next instruction to run.">program counter</span> points at the next one; the CPU fetches it, decodes what the number means, executes it, advances the PC, and repeats. Those hex opcodes — <code>$A9</code>, <code>$6D</code>, <code>$8D</code>, <code>$4C</code> — are the real 65816 codes for LDA, ADC, STA and JMP.</figcaption>
+          </figure>
+
+          <h4>A worked example, by hand</h4>
+          <p>
+            Let's invent the smallest possible machine and run it on paper. Our
+            toy CPU has 16 memory cells (addresses 0–15), one working register
+            called <strong>A</strong> — the <strong>accumulator</strong> (a
+            register is a scratch value inside the CPU — Module 02 is all about
+            them), and a PC. Each instruction is one byte: the first hex digit
+            says <em>what to do</em> — the
+            <span class="term" data-tip="The part of an instruction's number that names the operation — 'load', 'add', 'store', 'jump'. The rest of the bits are its operands.">opcode</span>
+            — and the second says <em>which cell to do it to</em>. Our whole
+            instruction set is four opcodes: <code>1n</code>&nbsp;=&nbsp;LDA
+            (load) cell&nbsp;<em>n</em> into A, <code>2n</code>&nbsp;=&nbsp;ADC
+            (add) cell&nbsp;<em>n</em> to A, <code>3n</code>&nbsp;=&nbsp;STA
+            (store) A into cell&nbsp;<em>n</em>, <code>4n</code>&nbsp;=&nbsp;JMP
+            (jump) to cell&nbsp;<em>n</em>. The 65816 is, at heart, exactly this
+            kind of accumulator machine — just with a real, rich instruction
+            set.
+          </p>
+          <p>
+            Now put this five-instruction program in cells 0–4, with data in
+            cells 12–14. Read it: <em>load cell 14, add cell 13, add cell 12,
+            store cell 14, jump to 0</em>. Cell 13 holds 2 and cell 12 holds 1,
+            so each trip round the loop the number in cell 14 grows by 3. That's
+            it — a counter, the &ldquo;hello world&rdquo; of hardware. The lab
+            below is this exact machine. Press <strong>Step</strong> and watch
+            each fetch, decode and execute happen; press <strong>Run</strong>
+            and watch it become a program.
+          </p>
+
+          <div class="lab" id="lab-toycpu">
+            <div class="lab-head"><span class="dot"></span><span class="title">Toy-CPU lab — a visible fetch–decode–execute machine</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="tc-cols">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Memory · 16 cells</div>
+                  <div class="tc-mem" data-tc-mem aria-label="Toy CPU memory cells"></div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Registers</div>
+                  <div class="tc-regs" data-tc-regs></div>
+                  <div class="tc-phase" data-tc-phase aria-hidden="true">
+                    <span data-phase="fetch">Fetch</span><span data-phase="decode">Decode</span><span data-phase="execute">Execute</span>
+                  </div>
+                  <div class="tc-narrate" data-tc-narrate aria-live="polite">Press <b>Step</b> to run one phase of the loop, or <b>Run</b> to let it fly.</div>
+                </div>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-tc-step>Step</button>
+                <button class="play-btn" data-tc-run style="background:linear-gradient(180deg,#a884ff,#7d5cf0);color:#120c22">Run</button>
+                <button class="play-btn" data-tc-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Reset</button>
+                <span style="font-size:12.5px;color:var(--muted)">Violet = where the PC points · cyan = memory being read · magenta = memory being written.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>A CPU repeats one loop forever: fetch an instruction, decode it, execute it.</li>
+              <li>Instructions are ordinary numbers in memory — programs and data share the same pigeonholes.</li>
+              <li>The program counter is the bookmark; a branch or jump is an instruction that rewrites it.</li>
+              <li>An instruction's number splits into an opcode (what to do) and operands (what to do it to).</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a class="disabled" aria-disabled="true"><span class="dir">← Prev</span><span class="ttl">Start of course</span></a>
+            <a class="next" href="#registers"><span class="dir">Next →</span><span class="ttl">02 · Registers, memory &amp; the ISA</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 02 --- -->
+      <section class="doc" id="registers">
+        <div class="mod-head">
+          <span class="eye">Module 02 <span class="part-tag">· Part I</span></span>
+          <h3>Registers, memory &amp; the ISA</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn what registers are, meet the actual 65816 programmer's model, and see why a CISC memory-operand machine is the opposite of a load/store RISC.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Our toy CPU had one working register, A. Real processors have more,
+            and the reason is distance — literally. Memory is a large structure
+            physically far (in chip terms) from the circuits that do arithmetic,
+            so every trip to it costs time. A <strong>register</strong> is a
+            small storage slot built <em>inside</em> the CPU, right next to the
+            arithmetic circuitry. It holds one value and reading or writing it
+            costs almost nothing. Registers are the workbench; memory is the
+            warehouse. There are only a handful precisely <em>because</em>
+            they're so close — you can't fit a warehouse on a workbench.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The workbench and the warehouse</span>
+            <p>
+              A carpenter doesn't walk to the warehouse for every screw. They
+              fetch a tray of parts to the bench, work there — where everything
+              is within arm's reach — and carry results back when done. A
+              <span class="term" data-tip="A small, ultra-fast storage slot inside the CPU itself. On the 65816 the accumulator and index registers are where work happens.">register</span>
+              is a spot on the bench; a <strong>load</strong> is the walk to the
+              warehouse shelf; a <strong>store</strong> is the walk back.
+            </p>
+          </div>
+
+          <h4>The 65816 programmer's model</h4>
+          <p>
+            Here is every register a Super Nintendo programmer actually touches.
+            The star is the <strong>accumulator A</strong>, where arithmetic
+            lands. Two <strong>index registers X and Y</strong> count and point.
+            The <strong>stack pointer S</strong> tracks a scratch area we'll
+            meet in Module 05. The <strong>processor status register P</strong>
+            is a row of one-bit flags. And a cluster of registers exist purely
+            to reach the 65816's big 24-bit address space: the
+            <strong>program bank PBR</strong>, the <strong>data bank DBR</strong>,
+            and the <strong>direct page D</strong> (Modules 04 and 09 explain
+            those in full).
+          </p>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Register</th><th>Width</th><th>What it holds</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill ax">A</span></td><td><span class="crc">8 or 16</span></td><td>Accumulator — the main work register for arithmetic and logic. Its width is a flag you set (Module 08).</td></tr>
+                <tr><td><span class="pill ax">X · Y</span></td><td><span class="crc">8 or 16</span></td><td>Index registers — counters and pointers, used to walk arrays. Their width is a separate flag.</td></tr>
+                <tr><td><span class="pill zelda">S</span></td><td><span class="crc">16-bit</span></td><td>Stack pointer — the top of the stack (Module 05). In emulation mode its high byte is locked to $01.</td></tr>
+                <tr><td><span class="pill axwii">P</span></td><td><span class="crc">8 flags</span></td><td>Status: <code>N V M X D I Z C</code> — plus the hidden <code>E</code> emulation bit.</td></tr>
+                <tr><td><span class="pill zelda">PC</span></td><td><span class="crc">16-bit</span></td><td>Program counter — the bookmark from Module 01, within the current program bank.</td></tr>
+                <tr><td><span class="pill util">PBR · DBR</span></td><td><span class="crc">8-bit</span></td><td>Program &amp; data bank registers — which 64 KB bank code and data live in (Module 09).</td></tr>
+                <tr><td><span class="pill util">D</span></td><td><span class="crc">16-bit</span></td><td>Direct page register — a movable fast-access window into bank 0 (Module 04).</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The flags in <strong>P</strong> record the outcome of the last
+            operation and steer branches: <strong>N</strong> (negative, top bit
+            set), <strong>V</strong> (signed overflow), <strong>Z</strong>
+            (zero), <strong>C</strong> (carry). <strong>I</strong> masks
+            interrupts, <strong>D</strong> switches arithmetic into decimal mode
+            (Module 03). And two flags are the whole reason Part II exists:
+            <strong>M</strong> sets the accumulator's width and <strong>X</strong>
+            sets the index registers' width — 8 or 16 bits — which is Module 08's
+            headline story.
+          </p>
+
+          <h4>CISC: arithmetic that touches memory</h4>
+          <p>
+            Now the family question. Many modern chips are
+            <span class="term" data-tip="Reduced Instruction Set Computer — simple, uniform, fixed-length instructions where arithmetic is register-to-register and only explicit loads/stores touch memory. ARM and PowerPC are RISC.">RISC</span>
+            <strong>load/store</strong> machines: arithmetic only works
+            register-to-register, and the <em>only</em> instructions that touch
+            memory are explicit loads and stores. The 65816 is the opposite — a
+            <span class="term" data-tip="Complex Instruction Set Computer — a design with variable-length instructions and operations that read their operands directly from memory. The 65816 is a classic small CISC.">CISC</span>
+            design. A single <code>ADC $2000</code> reads a value straight out
+            of memory, adds it to A, and sets the flags, all in one
+            instruction. And 65816 instructions are <strong>variable length</strong>:
+            one byte (<code>INX</code>), two (<code>LDA #$10</code>), three
+            (<code>LDA $2000</code>), even four (<code>LDA $7E2000</code>). The
+            opcode's identity and — as Module 08 will show — the current flag
+            state decide how many bytes follow. This flexibility is exactly what
+            makes decoding trickier than a fixed-size RISC, and it shapes every
+            emulator in Part III.
+          </p>
+          <div class="pipe">
+            <div class="stage"><div class="t"><code>LDA $2000</code></div><div class="d">load A straight from memory address $2000</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t"><code>ADC $2002</code></div><div class="d">add the value at $2002 to A — memory operand!</div></div>
+            <div class="arrow">→</div>
+            <div class="stage"><div class="t"><code>STA $2004</code></div><div class="d">store the result back to memory</div></div>
+          </div>
+          <p style="font-size:13px;color:var(--muted)">
+            Three instructions on the 65816 where a RISC would need a load, a
+            load, an add, and a store — because ADC is allowed to read memory
+            directly.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Registers are ultra-fast slots inside the CPU; memory is the big, slow warehouse.</li>
+              <li>The 65816 model: accumulator A, index X/Y, stack S, status P (N V M X D I Z C + hidden E), PC, and the bank/page registers PBR, DBR, D.</li>
+              <li>The 65816 is CISC: arithmetic can read a memory operand directly, and instructions are variable length.</li>
+              <li>The M and X flags set register widths — the pivot the whole of Part II turns on.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#loop"><span class="dir">← Prev</span><span class="ttl">01 · The fetch–decode–execute loop</span></a>
+            <a class="next" href="#numbers"><span class="dir">Next →</span><span class="ttl">03 · Numbers in silicon</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 03 --- -->
+      <section class="doc" id="numbers">
+        <div class="mod-head">
+          <span class="eye">Module 03 <span class="part-tag">· Part I</span></span>
+          <h3>Numbers in silicon</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how bits encode whole numbers, negatives, carry and overflow — and meet the 65xx family's oddest party trick, BCD decimal mode.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Everything a CPU touches is stored in <strong>bits</strong> —
+            switches that are either 0 or 1. A row of bits reads as a number in
+            <strong>binary</strong>, exactly like decimal but with columns worth
+            1, 2, 4, 8, 16… instead of 1, 10, 100. So <code>1011</code> is
+            8&nbsp;+&nbsp;2&nbsp;+&nbsp;1 = 11. With <em>n</em> bits you get
+            2<sup>n</sup> patterns: a byte (8 bits) covers 0–255, and a 16-bit
+            value covers 0–65535. Programmers write these in
+            <strong>hexadecimal</strong> — base 16, one hex digit per four bits —
+            because it lines up with the hardware. So <code>$FF</code> is 255,
+            <code>$100</code> is 256, and a full bank address like
+            <code>$7E2000</code> is just six tidy hex digits.
+          </p>
+          <p>
+            Negative numbers need a convention, and the universal one is
+            <strong>two's complement</strong>: keep counting past the top and
+            let the value wrap around, like an odometer rolling over — except we
+            <em>relabel</em> the top half of the patterns as the negatives. In 8
+            bits, <code>$FF</code> is −1, <code>$FE</code> is −2, down to
+            <code>$80</code> = −128. The lovely consequence: the same adder
+            circuit adds signed and unsigned numbers correctly without knowing
+            which it's doing. Two flags watch the edges: the
+            <span class="term" data-tip="The carry flag (C) — set when an unsigned addition overflows past the top of the register, or borrowed in a subtraction. It's the bit that carries into the next byte of a multi-byte add.">carry flag</span>
+            catches an unsigned result spilling past the top of the register,
+            and the <span class="term" data-tip="The overflow flag (V) — set when a signed addition produces the wrong sign, e.g. two positives summing to a negative. It watches the sign bit, where carry watches the top bit.">overflow flag</span>
+            catches a signed result whose sign came out wrong. Carry is also how
+            you chain bytes: add the low bytes, then add the high bytes
+            <em>plus carry</em>, and you've added a 16-bit number on an 8-bit ALU.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The odometer</span>
+            <p>
+              An 8-bit register is a car odometer with three... no, with room
+              for 0 to 255. Drive one past 255 and it clicks back to 0 — that
+              click is the <span class="term" data-tip="Set when an add rolls past the top of the register (255 for 8 bits). Also the value pulled in during a subtraction.">carry</span>.
+              Two's complement just decides to call the top half of the dial —
+              128 to 255 — the negatives −128 to −1 instead. Same physical dial,
+              two ways of reading it, and the same clicking works for both.
+            </p>
+          </div>
+
+          <h4>The 65xx oddity: decimal mode</h4>
+          <p>
+            Here's something most CPUs never had. The 65816 (like the 6502
+            before it) has a <strong>decimal mode</strong>, switched on by the
+            <strong>D</strong> flag in the status register. With D set,
+            <code>ADC</code> and <code>SBC</code> stop doing plain binary
+            arithmetic and instead treat each byte as two
+            <span class="term" data-tip="Binary-Coded Decimal — each 4-bit nibble stores one decimal digit 0–9. The byte $25 read as BCD is the number twenty-five, not $25 = 37. Decimal mode makes ADC carry between nibbles at 10, not 16.">packed BCD</span>
+            digits. In BCD, the byte <code>$25</code> literally means the number
+            <em>twenty-five</em> — the high nibble is the tens digit, the low
+            nibble the units — and <code>ADC</code> carries from the units to
+            the tens at <em>10</em>, not 16. Add <code>$25</code> and
+            <code>$18</code> in decimal mode and you get <code>$43</code>
+            (forty-three), not <code>$3D</code>. It's built for score counters,
+            clocks and anything displayed as decimal digits, sparing the
+            programmer a binary-to-decimal conversion. The catch: a nibble
+            greater than 9 (like the <code>$F</code> in <code>$1F</code>) isn't
+            a valid BCD digit, and feeding one to a decimal-mode add gives
+            nonsense — one more thing an accurate emulator must reproduce
+            exactly.
+          </p>
+
+          <p>
+            Go poke the bits yourself. Every square below is a button. Flip them
+            and read the same pattern four ways at once — as an unsigned number,
+            as a two's-complement signed number, as hex, and as packed BCD. Then
+            switch the width between 8 and 16 bits and watch the ranges change:
+            it's the M/X flag width choice of Module 08, previewed.
+          </p>
+
+          <div class="lab" id="lab-int">
+            <div class="lab-head"><span class="dot"></span><span class="title">Integer lab — one bit pattern, four readings</span><span class="badge">binary · live</span></div>
+            <div class="lab-body">
+              <div class="bits" data-int-bits aria-label="The bits of an integer; each is a toggle button"></div>
+              <div class="bit-legend">
+                <span><span class="sw" style="background:var(--amber)"></span>high byte</span>
+                <span><span class="sw" style="background:var(--cyan)"></span>low byte</span>
+              </div>
+              <div class="float-read">
+                <div class="fr"><span class="k">Unsigned</span><span class="v" data-i-unsigned>—</span></div>
+                <div class="fr"><span class="k">Signed (two's comp.)</span><span class="v" data-i-signed>—</span></div>
+                <div class="fr"><span class="k">Hexadecimal</span><span class="v" data-i-hex>—</span></div>
+                <div class="fr"><span class="k">Packed BCD</span><span class="v" data-i-bcd>—</span></div>
+                <div class="fr"><span class="k">Note</span><span class="v" data-i-note>—</span></div>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Register width</label>
+                  <div class="seg-btns" role="group" aria-label="Integer width">
+                    <button class="on" data-int-width="8">8-bit</button>
+                    <button data-int-width="16">16-bit</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label>Presets</label>
+                  <div class="seg-btns" role="group" aria-label="Integer presets">
+                    <button data-int-preset="42">42</button>
+                    <button data-int-preset="255">$FF</button>
+                    <button data-int-preset="128">$80</button>
+                    <button data-int-preset="55">$37 (BCD)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Binary counts in powers of two; hexadecimal groups four bits per digit and lines up with the hardware.</li>
+              <li>Two's complement relabels the top half of the pattern space so one adder handles signed and unsigned.</li>
+              <li>Carry catches unsigned overflow (and chains multi-byte adds); the V flag catches signed overflow.</li>
+              <li>The D flag switches ADC/SBC into BCD decimal mode — base-10 arithmetic in hardware, a 65xx trademark.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#registers"><span class="dir">← Prev</span><span class="ttl">02 · Registers, memory &amp; the ISA</span></a>
+            <a class="next" href="#addressing"><span class="dir">Next →</span><span class="ttl">04 · Addressing modes</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 04 --- -->
+      <section class="doc" id="addressing">
+        <div class="mod-head">
+          <span class="eye">Module 04 <span class="part-tag">· Part I</span></span>
+          <h3>Addressing modes</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the same instruction reaches its data a dozen different ways — and how each mode resolves an operand and the registers to one 24-bit effective address.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            An instruction like <code>LDA</code> — load the accumulator — needs
+            to know <em>where</em> to load from. The way it specifies that
+            &ldquo;where&rdquo; is its <strong>addressing mode</strong>, and the
+            65816 is famous for having a rich set of them. The same mnemonic
+            plus a different mode produces a different opcode byte, a different
+            instruction length, and a different number of cycles. Master the
+            modes and you've mastered most of what makes 65816 code look the way
+            it does.
+          </p>
+          <p>
+            The address a mode finally computes is called the
+            <span class="term" data-tip="The actual 24-bit memory address an instruction ends up reading or writing, after its addressing mode has combined the operand bytes with the relevant registers.">effective address</span>.
+            Some modes build it from operand bytes alone; others fold in a
+            register. The simplest is <strong>immediate</strong>
+            (<code>LDA #$42</code>): the operand <em>is</em> the data, so there's
+            no address at all. <strong>Absolute</strong> (<code>LDA $2000</code>)
+            gives a 16-bit address, and the current <strong>data bank</strong>
+            supplies the top 8 bits. <strong>Absolute long</strong>
+            (<code>LDA $7E2000</code>) spells out all 24 bits itself.
+          </p>
+          <p>
+            Two register-backed shortcuts matter enormously. The
+            <strong>direct page</strong> (the 65816's grown-up version of the
+            6502's &ldquo;zero page&rdquo;) is a movable 256-byte window into
+            bank 0, its base held in the
+            <span class="term" data-tip="The direct page register D — a 16-bit base added to the small operand of direct-page modes. Moving D relocates a whole 256-byte fast-access window, e.g. to give each subroutine its own scratch area.">D register</span>.
+            <code>LDA $10</code> means &ldquo;D plus $10&rdquo; — a one-byte
+            operand reaching a fast, nearby scratch area. And <strong>indexed</strong>
+            modes add <strong>X</strong> or <strong>Y</strong> to the address, so
+            a loop can walk an array by simply incrementing an index. Stack
+            everything up — direct or absolute, short or long, plain or indexed,
+            direct or through a pointer (<strong>indirect</strong>) — and you get
+            the two dozen ways the 65816 can say &ldquo;there&rdquo;.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Giving someone directions</span>
+            <p>
+              &ldquo;Here, take this&rdquo; is immediate — the thing is in your
+              hand. &ldquo;House number 8000&rdquo; is absolute — but only makes
+              sense once you know the town (the <span class="term" data-tip="The data bank register DBR supplies the top 8 bits (the bank) for absolute addressing, so a 16-bit address becomes a full 24-bit one.">data bank</span>).
+              &ldquo;Number 16 on our street&rdquo; is direct-page — short,
+              because &ldquo;our street&rdquo; (D) is understood. &ldquo;Go to
+              the address written on that note&rdquo; is indirect. And
+              &ldquo;the fourth house past this one&rdquo; is indexed. Same
+              destination, wildly different instructions to reach it.
+            </p>
+          </div>
+
+          <p>
+            The lab lets you pick a mode and watch it resolve. The register file
+            is fixed at plausible values (data bank <code>$7E</code>, direct page
+            <code>$1F00</code>, X = 4, Y = $10, stack at <code>$01FF</code>); a
+            small memory holds the pointers the indirect modes chase. Choose a
+            mode and read the numbered steps combine the operand with the
+            highlighted registers into one 24-bit effective address.
+          </p>
+
+          <div class="lab" id="lab-addr">
+            <div class="lab-head"><span class="dot"></span><span class="title">Addressing-mode explorer — operand + registers → 24-bit address</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="controls">
+                <div class="ctrl" style="min-width:280px">
+                  <label>Addressing mode</label>
+                  <select data-addr-mode aria-label="Addressing mode">
+                    <option value="imm">Immediate — LDA #$42</option>
+                    <option value="dp" selected>Direct Page — LDA $10</option>
+                    <option value="dpx">Direct Page Indexed,X — LDA $10,X</option>
+                    <option value="abs">Absolute — LDA $2000</option>
+                    <option value="absx">Absolute Indexed,X — LDA $2000,X</option>
+                    <option value="absl">Absolute Long — LDA $7E2000</option>
+                    <option value="abslx">Absolute Long Indexed,X — LDA $7E2000,X</option>
+                    <option value="dind">DP Indirect — LDA ($10)</option>
+                    <option value="dindl">DP Indirect Long — LDA [$10]</option>
+                    <option value="dindy">DP Indirect Indexed,Y — LDA ($10),Y</option>
+                    <option value="sr">Stack Relative — LDA $02,S</option>
+                    <option value="sriy">SR Indirect Indexed,Y — LDA ($02,S),Y</option>
+                  </select>
+                </div>
+              </div>
+              <div class="addr-grid">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Register file</div>
+                  <div class="reg-chips" data-addr-regs></div>
+                  <div class="lab-sub" style="margin:14px 0 6px">Operand bytes</div>
+                  <div class="addr-step" data-addr-operand>—</div>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Resolution, step by step</div>
+                  <div class="addr-steps" data-addr-steps></div>
+                  <div class="addr-eff" data-addr-eff>—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An addressing mode is <em>how</em> an instruction names its data; the result is a 24-bit effective address.</li>
+              <li>Immediate needs no address; absolute borrows the data bank; absolute long spells all 24 bits out.</li>
+              <li>The direct-page register D gives a movable short-operand window; X and Y index for array walks.</li>
+              <li>Indirect modes chase a pointer stored in memory — the workhorse <code>(dp),Y</code> is how you scan arrays.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#numbers"><span class="dir">← Prev</span><span class="ttl">03 · Numbers in silicon</span></a>
+            <a class="next" href="#stack"><span class="dir">Next →</span><span class="ttl">05 · The stack &amp; subroutines</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 05 --- -->
+      <section class="doc" id="stack">
+        <div class="mod-head">
+          <span class="eye">Module 05 <span class="part-tag">· Part I</span></span>
+          <h3>The stack &amp; subroutines</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the stack: a last-in-first-out scratch area that makes subroutines, nested calls and interrupts possible.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Programs are built from <strong>subroutines</strong> — reusable
+            chunks of code you can call from anywhere. But that raises a
+            question: when a subroutine finishes, how does the CPU know where to
+            <em>return</em> to? The answer is the <strong>stack</strong>: a
+            region of memory used strictly last-in-first-out, like a spike where
+            you impale receipts. You <strong>push</strong> a value on top; you
+            <strong>pull</strong> (pop) the top value back off. The
+            <span class="term" data-tip="The stack pointer S — a register holding the address of the top of the stack. Pushing writes then decrements S; pulling increments S then reads.">stack pointer S</span>
+            always marks the top.
+          </p>
+          <p>
+            On the 65816 the stack grows <em>downward</em>: a push writes to the
+            address in S and then decrements S; a pull increments S and then
+            reads. In <strong>emulation mode</strong> (how the console boots) the
+            stack is locked to <strong>page 1</strong> — addresses
+            <code>$0100–$01FF</code>, just like the 6502 — so only the low byte
+            of S moves. Switch to <strong>native mode</strong> (Module 08) and
+            the stack becomes a full 16-bit pointer that can live
+            <em>anywhere</em> in bank 0, so a program can have as much stack as
+            it needs.
+          </p>
+          <p>
+            Subroutines ride on this. <code>JSR</code> (jump to subroutine)
+            pushes the return address onto the stack, then jumps;
+            <code>RTS</code> (return) pulls that address back and resumes just
+            after the call. Because pushes stack up, calls can nest as deep as
+            memory allows — each <code>RTS</code> unwinds one level. The 65816
+            adds long versions for its 24-bit world: <code>JSL</code> pushes the
+            program <em>bank</em> too and <code>RTL</code> restores it, so a
+            subroutine can live in a different 64 KB bank. And
+            <strong>interrupts</strong> (Module 06) use the very same mechanism —
+            they push the return address <em>and</em> the status register P, so
+            the interrupted code can be resumed exactly as it was.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A stack of plates</span>
+            <p>
+              A cafeteria plate dispenser: you add clean plates to the top and
+              take them from the top. The last plate on is the first plate off —
+              <span class="term" data-tip="Last-In-First-Out — the discipline the stack enforces. The most recently pushed value is always the next one pulled.">LIFO</span>.
+              When a subroutine calls another which calls another, each return
+              address is a plate; every <code>RTS</code> lifts the top plate and
+              goes back exactly where it came from. Lose track of the plates —
+              push without pulling, or vice versa — and the program returns to a
+              wrong address and crashes. The stack's discipline is what keeps
+              nesting sane.
+            </p>
+          </div>
+
+          <p>
+            Play with it below. <strong>PHA</strong> pushes the accumulator;
+            <strong>PLA</strong> pulls it back. <strong>JSR</strong> pushes a
+            two-byte return address (high byte first) and <strong>RTS</strong>
+            pulls it. Watch <code>S</code> walk downward on every push and back
+            up on every pull, and watch the top-of-stack byte light up.
+          </p>
+
+          <div class="lab" id="lab-stack">
+            <div class="lab-head"><span class="dot"></span><span class="title">Stack lab — push, pull, call &amp; return</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="stack-cols">
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">Stack memory · page 1 · S = <b data-stack-sp style="color:var(--violet)">$01FF</b></div>
+                  <div class="stack-col" data-stack-col aria-label="Stack memory cells"></div>
+                </div>
+                <div>
+                  <div class="tc-narrate" data-stack-narrate style="margin-top:0" aria-live="polite">The stack lives in page 1.</div>
+                  <div class="controls" style="margin-top:14px">
+                    <button class="play-btn" data-stack-pha>PHA · push A</button>
+                    <button class="play-btn" data-stack-pla style="background:linear-gradient(180deg,#a884ff,#7d5cf0);color:#120c22">PLA · pull A</button>
+                  </div>
+                  <div class="controls" style="margin-top:10px">
+                    <button class="play-btn" data-stack-jsr style="background:linear-gradient(180deg,#ffb14e,#c9832b);color:#201400">JSR · call</button>
+                    <button class="play-btn" data-stack-rts style="background:linear-gradient(180deg,#ff5f9e,#c93e77);color:#200">RTS · return</button>
+                    <button class="play-btn" data-stack-reset style="background:linear-gradient(180deg,#3a3357,#2c2542);color:var(--ink)">Reset</button>
+                  </div>
+                  <p style="font-size:12.5px;color:var(--muted);margin-top:12px">Violet outline = S (next free byte) · cyan = the current top of stack.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The stack is a last-in-first-out scratch area; the stack pointer S marks the top, and it grows downward.</li>
+              <li>Emulation mode locks the stack to page 1 ($0100–$01FF); native mode frees S to roam all of bank 0.</li>
+              <li>JSR/RTS push and pull a return address; JSL/RTL do it across banks for the 24-bit world.</li>
+              <li>Interrupts push the return address <em>and</em> the P status register, so interrupted code resumes intact.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#addressing"><span class="dir">← Prev</span><span class="ttl">04 · Addressing modes</span></a>
+            <a class="next" href="#interrupts"><span class="dir">Next →</span><span class="ttl">06 · Interrupts &amp; timing</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 06 --- -->
+      <section class="doc" id="interrupts">
+        <div class="mod-head">
+          <span class="eye">Module 06 <span class="part-tag">· Part I</span></span>
+          <h3>Interrupts &amp; timing</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Learn how hardware interrupts hijack the CPU at just the right instant, meet the vector table, and see how the master clock divides into three CPU speeds.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            So far our CPU has run in a straight line, one instruction after the
+            next. But a games console is full of hardware that needs attention
+            at precise moments — most of all the video chip, which draws the
+            screen line by line and must be left alone <em>while</em> it draws.
+            The mechanism is the <strong>interrupt</strong>: a hardware signal
+            that makes the CPU stop what it's doing, save its place, and jump to
+            a special handler routine — then, via
+            <span class="term" data-tip="Return from interrupt — pulls the saved status register P and the return address back off the stack, resuming the interrupted code exactly where it left off.">RTI</span>,
+            resume the interrupted code exactly where it left off. The stack from
+            Module 05 is what makes that clean resume possible: the interrupt
+            pushes the return address and the P register before jumping.
+          </p>
+          <p>
+            The Super Nintendo's CPU listens for three: <strong>NMI</strong>
+            (non-maskable interrupt), which fires at the start of
+            <span class="term" data-tip="Vertical blanking — the brief period after the last visible scanline is drawn, before the beam returns to the top. Video RAM is safe to update only during V-blank.">V-blank</span>
+            — the moment the screen finishes drawing and it's finally safe to
+            update video memory; <strong>IRQ</strong> (interrupt request), which
+            games program to fire at a chosen horizontal/vertical beam position
+            for mid-screen effects; and <strong>RESET</strong>, which starts the
+            machine. How does the CPU know where each handler lives? A fixed
+            <span class="term" data-tip="A small table of addresses at the very top of memory ($FFE0–$FFFF) telling the CPU where to jump for each interrupt — NMI, IRQ, RESET, BRK. Native and emulation mode use different entries.">vector table</span>
+            at the top of bank 0: the NMI handler's address sits at
+            <code>$FFEA</code> (native mode), IRQ at <code>$FFEE</code>, and
+            RESET at <code>$FFFC</code>. On an interrupt the CPU reads the
+            address there and jumps to it — no guessing.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The phone that must be answered</span>
+            <p>
+              You're doing paperwork when the phone rings. You mark your line,
+              take the call, deal with it, then return to the exact word you
+              stopped at. The ring is the interrupt; the bookmark you jot is the
+              stack push; the phone number you dial back is the
+              <span class="term" data-tip="An entry in the vector table pointing at the routine that handles a particular interrupt.">vector</span>.
+              NMI is the call you're not allowed to ignore — the screen is
+              blanking <em>now</em> and won't wait.
+            </p>
+          </div>
+
+          <h4>The clock, and why it has three speeds</h4>
+          <p>
+            The 5A22 generates one <strong>master clock</strong> — about
+            <strong>21.477&nbsp;MHz</strong> on an NTSC console — and every part
+            of the machine steps off it. The CPU does <em>not</em> run at that
+            rate; instead each memory access takes a whole number of master
+            cycles, and that number depends on <em>what</em> is being accessed.
+            Fast regions (including cartridge ROM wired for
+            <span class="term" data-tip="A cartridge and mapping wired so the CPU can read ROM at the fastest 6-master-cycle (3.58 MHz) speed. SlowROM carts read at 8 cycles instead.">FastROM</span>)
+            cost <strong>6</strong> master cycles per access — an effective
+            <strong>3.58&nbsp;MHz</strong>. Most of the map, including
+            <span class="term" data-tip="Cartridge ROM read at the standard 8-master-cycle (2.68 MHz) speed. The default unless the ROM and mapping opt into FastROM.">SlowROM</span>,
+            costs <strong>8</strong> cycles — <strong>2.68&nbsp;MHz</strong>. And
+            the slow I/O area (the old serial joypad ports at
+            <code>$4000–$41FF</code>) costs <strong>12</strong> cycles —
+            <strong>1.79&nbsp;MHz</strong>. Same CPU, three speeds, chosen by the
+            address bus.
+          </p>
+
+          <p>
+            The lab draws one NTSC frame as a vertical timeline: 262 scanlines,
+            the visible region on top and V-blank below. A beam sweeps down;
+            the instant it crosses into V-blank, <strong>NMI</strong> fires and
+            the counter ticks. Below, pick a memory-access speed and read how the
+            master clock divides into the CPU's three real rates.
+          </p>
+
+          <div class="lab" id="lab-timing">
+            <div class="lab-head"><span class="dot"></span><span class="title">Timing lab — the frame, the beam &amp; the NMI</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <canvas class="timing-canvas" aria-label="A vertical timeline of one video frame with a sweeping beam and an NMI marker"></canvas>
+              <div class="stat-row">
+                <span class="stat-chip">scanline <b data-t-line>0</b></span>
+                <span class="stat-chip">region <b data-t-region>visible</b></span>
+                <span class="stat-chip">NMIs fired <b data-t-nmi>0</b></span>
+              </div>
+              <div class="controls">
+                <button class="play-btn" data-t-run>Run</button>
+                <div class="ctrl">
+                  <label>CPU access speed</label>
+                  <div class="seg-btns" role="group" aria-label="Memory access speed">
+                    <button data-t-clk="fast">FastROM</button>
+                    <button class="on" data-t-clk="slow">SlowROM</button>
+                    <button data-t-clk="io">Slow I/O</button>
+                  </div>
+                </div>
+              </div>
+              <div class="addr-step" data-t-speed>—</div>
+            </div>
+          </div>
+
+          <p>
+            That's the whole Part I toolkit: the loop, registers, number formats,
+            addressing modes, the stack, and interrupts &amp; timing. Everything
+            in Part II is these six ideas put into real Nintendo silicon. Time to
+            meet the chip.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An interrupt makes the CPU save its place on the stack and jump to a handler, then resume via RTI.</li>
+              <li>NMI fires at V-blank (the only safe time to touch video memory); IRQ fires at a chosen beam position; RESET boots the machine.</li>
+              <li>The vector table at $FFE0–$FFFF tells the CPU where each handler lives — NMI native at $FFEA.</li>
+              <li>One 21.477 MHz master clock divides into 3.58 / 2.68 / 1.79 MHz CPU access speeds, chosen by the address.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#stack"><span class="dir">← Prev</span><span class="ttl">05 · The stack &amp; subroutines</span></a>
+            <a class="next" href="#a22"><span class="dir">Next → Part II</span><span class="ttl">07 · Meet the 5A22</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART II ============= -->
+      <section class="part" id="part-2">
+        <div class="part-inner">
+          <div class="kicker">Part II</div>
+          <h3>The 5A22</h3>
+          <p>
+            Now we put the Part&nbsp;I toolkit into real silicon. Nintendo didn't
+            design a CPU core from scratch — it licensed the proven 65816 and
+            asked Ricoh to wrap it in exactly the peripherals a games console
+            needs: DMA and HDMA controllers to move data fast, a hardware
+            multiply/divide unit, controller ports, WRAM refresh, and clock
+            generation, all on one die called the <strong>5A22</strong>. These
+            six modules cover the CPU's two operating widths, its unusual 24-bit
+            banked memory, the two DMA engines, and the math unit — each mapping
+            straight back to a fundamental you already know.
+          </p>
+          <div class="part-meta"><span>Modules <b>07–12</b></span><span>Difficulty <b>Hardware</b></span><span>Labs <b>5 interactive</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 07 --- -->
+      <section class="doc" id="a22">
+        <div class="mod-head">
+          <span class="eye">Module 07 <span class="part-tag">· Part II</span></span>
+          <h3>Meet the 5A22</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Meet the actual chip: a 65C816 core plus Nintendo's on-die DMA, math, I/O and clock hardware — and its three region clocks.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The Super Nintendo's CPU chip is the <strong>Ricoh 5A22</strong>. At
+            its heart is a <strong>65C816</strong> processor core — the 16-bit
+            successor to the 6502 that ran the NES, the Apple II and the
+            Commodore 64. But the 5A22 is more than the core: Ricoh integrated
+            onto the same die a set of peripherals that would otherwise need
+            separate chips. That's why we call it the 5A22 and not just
+            &ldquo;the 65816&rdquo; — the CPU you program is the core, but the
+            silicon in the box does far more.
+          </p>
+          <p>
+            What Ricoh added around the core: the <strong>DMA and HDMA
+            controllers</strong> (eight channels that copy blocks of memory
+            without the CPU lifting a finger — Modules 10 and 11), a
+            <strong>hardware multiply and divide unit</strong> (the 65816 core
+            can't multiply on its own — Module 12), the <strong>parallel I/O and
+            controller ports</strong> plus automatic joypad reading,
+            <strong>WRAM refresh</strong> logic to keep the 128 KB of work RAM
+            alive, and the <strong>clock generation</strong> that produces the
+            21.477&nbsp;MHz master signal the whole console marches to. The core
+            thinks; the 5A22's peripherals do the heavy lifting around it.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The chef and the fitted kitchen</span>
+            <p>
+              The 65816 core is a skilled chef. But a chef alone in an empty room
+              can't cook — the 5A22 is the fitted kitchen built around them: the
+              dishwasher that clears plates while they work (DMA), the calculator
+              on the wall for portions (the math unit), the intercom to the dining
+              room (the controller ports), and the clock on the wall everyone
+              works to. Nintendo bought the chef and built the kitchen to suit
+              exactly one restaurant.
+            </p>
+          </div>
+
+          <figure class="dsp-diagram">
+            <svg viewBox="0 0 940 430" role="img" aria-labelledby="sysd-t sysd-d">
+              <title id="sysd-t">The Ricoh 5A22 and the console around it</title>
+              <desc id="sysd-d">A 65C816 core sits inside the 5A22 alongside DMA/HDMA, the multiply/divide unit, I/O ports, WRAM refresh and clock generation. The chip connects to 128 KB of work RAM, the PPU, the APU sound subsystem and the cartridge.</desc>
+              <defs><marker id="m7a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#877f9e"/></marker><marker id="m7c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="#45e4d1"/></marker></defs>
+              <rect x="24" y="60" width="470" height="320" rx="16" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <text x="44" y="90" class="d-tag">Ricoh 5A22</text>
+              <text x="44" y="108" class="d-sub">the SNES CPU chip · 21.477 MHz master clock</text>
+              <rect x="44" y="124" width="200" height="80" rx="10" class="d-fill-panel d-cyan-s" stroke-width="1.5"/>
+              <text x="144" y="154" text-anchor="middle" class="d-label" style="font-size:13px">65C816 core</text>
+              <text x="144" y="176" text-anchor="middle" class="d-sub">the CPU you program</text>
+              <text x="144" y="192" text-anchor="middle" class="d-sub">8/16-bit · Part I</text>
+              <rect x="260" y="124" width="210" height="38" rx="8" class="d-fill-panel d-violet-s" stroke-width="1.3"/><text x="365" y="148" text-anchor="middle" class="d-sub">DMA + HDMA · 8 ch · Mod 10–11</text>
+              <rect x="260" y="166" width="210" height="38" rx="8" class="d-fill-panel d-amber-s" stroke-width="1.3"/><text x="365" y="190" text-anchor="middle" class="d-sub">multiply / divide · Mod 12</text>
+              <rect x="44" y="220" width="200" height="38" rx="8" class="d-fill-panel d-magenta-s" stroke-width="1.3"/><text x="144" y="244" text-anchor="middle" class="d-sub">I/O + joypad ports</text>
+              <rect x="260" y="220" width="210" height="38" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/><text x="365" y="244" text-anchor="middle" class="d-sub">WRAM refresh</text>
+              <rect x="44" y="274" width="426" height="38" rx="8" class="d-fill-panel d-stroke-line" stroke-width="1.3"/><text x="257" y="298" text-anchor="middle" class="d-sub">clock generation → 6 / 8 / 12 master cycles per access</text>
+              <text x="44" y="348" class="d-sub">a 65816 core plus everything a console needs, on one die</text>
+
+              <rect x="540" y="70" width="180" height="60" rx="10" class="d-fill-panel2 d-cyan-s" stroke-width="1.5"/>
+              <text x="630" y="96" text-anchor="middle" class="d-label" style="font-size:12.5px">WRAM · 128 KB</text>
+              <text x="630" y="115" text-anchor="middle" class="d-sub">$7E–$7F · Mod 09</text>
+              <rect x="540" y="150" width="180" height="60" rx="10" class="d-fill-panel2 d-violet-s" stroke-width="1.5"/>
+              <text x="630" y="176" text-anchor="middle" class="d-label" style="font-size:12.5px">PPU</text>
+              <text x="630" y="195" text-anchor="middle" class="d-sub">$2100–$213F · video</text>
+              <rect x="540" y="230" width="180" height="60" rx="10" class="d-fill-panel2 d-magenta-s" stroke-width="1.5"/>
+              <text x="630" y="256" text-anchor="middle" class="d-label" style="font-size:12.5px">APU (SPC700)</text>
+              <text x="630" y="275" text-anchor="middle" class="d-sub">$2140–$2143 · sound</text>
+              <rect x="540" y="310" width="180" height="56" rx="10" class="d-fill-panel2 d-amber-s" stroke-width="1.5"/>
+              <text x="630" y="334" text-anchor="middle" class="d-label" style="font-size:12.5px">Cartridge</text>
+              <text x="630" y="352" text-anchor="middle" class="d-sub">ROM · SRAM · chips</text>
+              <line x1="494" y1="100" x2="536" y2="100" class="d-axis" stroke-width="1.8" marker-end="url(#m7c)"/>
+              <line x1="494" y1="180" x2="536" y2="180" class="d-axis" stroke-width="1.8" marker-end="url(#m7c)"/>
+              <line x1="494" y1="260" x2="536" y2="260" class="d-axis" stroke-width="1.8" marker-end="url(#m7a)"/>
+              <line x1="494" y1="338" x2="536" y2="338" class="d-axis" stroke-width="1.8" marker-end="url(#m7a)"/>
+
+              <rect x="770" y="150" width="146" height="130" rx="12" class="d-fill-ground d-stroke-line" stroke-width="1.5"/>
+              <text x="843" y="140" text-anchor="middle" class="d-tag">Region clocks</text>
+              <text x="782" y="178" class="d-sub">Fast · 6 cyc · 3.58 MHz</text>
+              <text x="782" y="206" class="d-sub">Slow · 8 cyc · 2.68 MHz</text>
+              <text x="782" y="234" class="d-sub">I/O · 12 cyc · 1.79 MHz</text>
+              <text x="782" y="262" class="d-sub">all ÷ from 21.477 MHz</text>
+            </svg>
+            <figcaption class="fig-cap"><strong>One chip, one clock.</strong> The 5A22 packages a <span class="term" data-tip="The 16-bit CPU core inside the 5A22, a CMOS version of the 65816. It's the processor you write instructions for; the rest of the 5A22 is support hardware.">65C816 core</span> with DMA/HDMA, the math unit, I/O and clock generation, and drives the WRAM, PPU, APU and cartridge. Every access is metered at 6, 8 or 12 master cycles.</figcaption>
+          </figure>
+
+          <div class="specs">
+            <div class="spec"><div class="k">Core</div><div class="v">65C816</div><div class="d">16-bit successor to the 6502</div></div>
+            <div class="spec"><div class="k">Master clock</div><div class="v">21.477<small> MHz</small></div><div class="d">NTSC · divides to 3.58 / 2.68 / 1.79</div></div>
+            <div class="spec"><div class="k">Address space</div><div class="v">16<small> MB</small></div><div class="d">24-bit · 256 banks of 64 KB</div></div>
+            <div class="spec"><div class="k">Work RAM</div><div class="v">128<small> KB</small></div><div class="d">$7E–$7F · refreshed on-die</div></div>
+            <div class="spec"><div class="k">DMA channels</div><div class="v">8</div><div class="d">General DMA + per-line HDMA</div></div>
+            <div class="spec"><div class="k">Math unit</div><div class="v">8×8 · 16÷8</div><div class="d">Unsigned multiply &amp; divide</div></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The SNES CPU chip is the Ricoh 5A22: a 65C816 core plus Nintendo's on-die peripherals.</li>
+              <li>Those peripherals are the DMA/HDMA controllers, the multiply/divide unit, I/O and joypad ports, WRAM refresh, and clock generation.</li>
+              <li>The core is the processor you program; the 5A22's extras do the fast data movement and math around it.</li>
+              <li>One 21.477 MHz master clock feeds the three region access speeds from Module 06.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#interrupts"><span class="dir">← Prev · Part I</span><span class="ttl">06 · Interrupts &amp; timing</span></a>
+            <a class="next" href="#width"><span class="dir">Next →</span><span class="ttl">08 · 8-bit or 16-bit? The M &amp; X flags</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 08 --- -->
+      <section class="doc" id="width">
+        <div class="mod-head">
+          <span class="eye">Module 08 <span class="part-tag">· Part II</span></span>
+          <h3>8-bit or 16-bit? The M &amp; X flags</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand the 65816's headline feature: emulation vs native mode, and the M and X flags that resize the registers — and re-decode the very same bytes.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Here is the 65816's defining trick — and its most notorious trap. The
+            chip can run in two personalities. It boots in
+            <strong>emulation mode</strong>, where it behaves as a fast 6502: all
+            registers 8-bit, the stack pinned to page 1. A game switches to
+            <strong>native mode</strong> with a two-instruction spell —
+            <code>CLC</code> then <code>XCE</code> (exchange carry with the hidden
+            <span class="term" data-tip="The emulation bit — a hidden status flag. When set, the 65816 behaves like a 6502; XCE swaps it with the carry flag, so CLC:XCE clears it and enters native 16-bit mode.">E flag</span>)
+            — and unlocks the full 16-bit machine.
+          </p>
+          <p>
+            In native mode two status flags choose register widths independently.
+            The <strong>M flag</strong> sets the <em>accumulator and memory</em>
+            width: M = 0 makes A a full 16-bit register, M = 1 keeps it 8-bit. The
+            <strong>X flag</strong> sets the <em>index registers</em> X and Y the
+            same way. You flip them whenever you like with <code>REP</code> (reset
+            = clear the bits, going 16-bit) and <code>SEP</code> (set the bits,
+            going 8-bit). Want 16-bit maths but 8-bit loop counters? Set M = 0,
+            X = 1. It's yours.
+          </p>
+          <p>
+            And now the classic gotcha. An immediate instruction like
+            <code>LDA #</code> carries its value <em>inline</em> — so how many
+            operand bytes follow depends on the current M flag. With M = 0 (16-bit)
+            <code>A9 34 12</code> is <code>LDA #$1234</code>, a three-byte
+            instruction. With M = 1 (8-bit) the very same opcode reads only one
+            operand byte: <code>A9 34</code> is <code>LDA #$34</code>, and the
+            <code>12</code> that follows is now the <em>next</em> instruction. The
+            identical bytes decode into completely different programs depending on
+            invisible processor state. Get the flag tracking wrong — in your head,
+            in a disassembler, or in an emulator — and everything downstream
+            shifts. It's the single most common way to misread 65816 code.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A recipe that reads in two languages</span>
+            <p>
+              Imagine a recipe where &ldquo;add 2 cups&rdquo; means two cups in one
+              chef's dialect but two <em>and a half</em> in another's — and the
+              dialect can switch mid-page with a tiny margin note. Read on without
+              noticing the note and every later line is off by an ingredient. The
+              M and X flags are that margin note: <code>REP</code>/<code>SEP</code>
+              silently change how many bytes each following instruction eats.
+            </p>
+          </div>
+
+          <p>
+            The lab makes it tangible. Toggle <strong>M</strong> and
+            <strong>X</strong> and watch A, X and Y resize between 8 and 16 bits.
+            Below them, a fixed stream of bytes is <em>re-decoded live</em> under
+            the current flags — watch instruction boundaries slide as immediate
+            operands grow and shrink, turning one byte stream into two different
+            programs.
+          </p>
+
+          <div class="lab" id="lab-width">
+            <div class="lab-head"><span class="dot"></span><span class="title">Width-flipper lab — M, X &amp; the re-decoding byte stream</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="controls" style="align-items:center">
+                <span style="font-size:12.5px;color:var(--muted)">Native mode · click to flip:</span>
+                <button class="flag-toggle" data-width-m><span class="fk">M</span><span class="fs">8-bit</span></button>
+                <button class="flag-toggle" data-width-x><span class="fk">X</span><span class="fs">8-bit</span></button>
+                <span style="font-size:12.5px;color:var(--muted)">off = 8-bit · lit = 16-bit</span>
+              </div>
+              <div>
+                <div class="lab-sub" style="margin-bottom:8px">Registers resize with the flags</div>
+                <div class="wregs" data-width-regs></div>
+              </div>
+              <div>
+                <div class="lab-sub" style="margin:6px 0 8px">The same bytes — <code>A9 34 12 A2 10 00 E8 CA 60</code> — re-decoded</div>
+                <div class="decode-list" data-width-list></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 65816 boots in 6502 emulation mode; CLC:XCE switches it to native 16-bit mode via the hidden E flag.</li>
+              <li>In native mode, the M flag sets accumulator/memory width and the X flag sets index width — each 8 or 16 bit.</li>
+              <li>REP clears the flags (16-bit); SEP sets them (8-bit) — toggle at will, even mid-routine.</li>
+              <li>Immediate operand length tracks the flags, so the same bytes decode into different instructions depending on M/X.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#a22"><span class="dir">← Prev</span><span class="ttl">07 · Meet the 5A22</span></a>
+            <a class="next" href="#banks"><span class="dir">Next →</span><span class="ttl">09 · The 24-bit address space &amp; banks</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 09 --- -->
+      <section class="doc" id="banks">
+        <div class="mod-head">
+          <span class="eye">Module 09 <span class="part-tag">· Part II</span></span>
+          <h3>The 24-bit address space &amp; banks</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Map the 16 MB the 65816 can reach — 256 banks of 64 KB — and learn where WRAM, the PPU, the APU, the CPU registers and cartridge ROM all live.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The 6502 could address 64 KB — 16 bits of address. The 65816 widens
+            that to <strong>24 bits</strong>: <strong>16 MB</strong>, organised as
+            <strong>256 banks</strong> of <strong>64 KB</strong> each. A full
+            address is written <code>bank:offset</code>, like
+            <code>$7E:2000</code>. The registers from Module 02 do the widening:
+            the <strong>program bank PBR</strong> supplies the top 8 bits of the
+            PC (which bank code runs in), and the <strong>data bank DBR</strong>
+            supplies the bank for absolute data accesses. The direct page
+            <strong>D</strong> gives a movable fast window inside bank 0.
+          </p>
+          <p>
+            What's actually <em>at</em> those addresses is the SNES
+            <strong>memory map</strong>, and it's worth knowing by heart. The
+            128 KB of work RAM lives in banks <strong>$7E–$7F</strong>; the low
+            8 KB (<code>$0000–$1FFF</code>) is mirrored into the bottom of every
+            &ldquo;system&rdquo; bank so zero-page-style code reaches it quickly.
+            The hardware registers sit in a narrow band of every system bank:
+            the <strong>PPU</strong> (video) at <code>$2100–$213F</code>, the
+            <strong>APU</strong> (sound) mailbox ports at
+            <code>$2140–$2143</code>, the <strong>CPU registers</strong> (NMI
+            control, the math unit, DMA enables) around <code>$4200–$421F</code>,
+            and the <strong>DMA channel registers</strong> at
+            <code>$4300–$437F</code>. Cartridge ROM fills the upper halves of the
+            banks (<code>$8000–$FFFF</code>) and the big upper banks.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · A tower of identical floors</span>
+            <p>
+              Picture a 256-floor tower, each floor a 64 KB bank. Some floors are
+              pure storage (RAM in $7E–$7F, ROM up top). But every &ldquo;system&rdquo;
+              floor shares an identical service corridor near the entrance — the
+              same lift buttons to the PPU, the APU, the DMA desk — because the
+              hardware is wired into all of them. The
+              <span class="term" data-tip="The program bank register (PBR) sets which 64 KB bank the program counter runs in; the data bank register (DBR) sets the bank for absolute data reads and writes.">bank registers</span>
+              are which floor you're currently standing on.
+            </p>
+          </div>
+
+          <p>
+            The lab is a live map probe. Type any 24-bit address — or hit a preset
+            — and it tells you which region (or mirror) that address lands in, with
+            a bar showing where inside the bank it falls. Try <code>$7E0100</code>
+            (work RAM), <code>$002100</code> (a PPU register), <code>$004202</code>
+            (the multiply register from Module 12), and <code>$808000</code>
+            (cartridge ROM).
+          </p>
+
+          <div class="lab" id="lab-memmap">
+            <div class="lab-head"><span class="dot"></span><span class="title">Memory-map viewer — where does this address land?</span><span class="badge">LoROM layout · live</span></div>
+            <div class="lab-body">
+              <div class="mm-input-row">
+                <input class="mm-hex" data-mm-addr value="$7E0100" aria-label="24-bit address in hex" spellcheck="false">
+                <div class="seg-btns" role="group" aria-label="Address presets">
+                  <button data-mm-preset="$7E0100">$7E0100</button>
+                  <button data-mm-preset="$002100">$002100</button>
+                  <button data-mm-preset="$002140">$002140</button>
+                  <button data-mm-preset="$004202">$004202</button>
+                  <button data-mm-preset="$004300">$004300</button>
+                  <button data-mm-preset="$808000">$808000</button>
+                  <button data-mm-preset="$000500">$000500</button>
+                </div>
+              </div>
+              <div class="mm-bar" data-mm-bar aria-hidden="true"></div>
+              <div class="mm-out" data-mm-out aria-live="polite">—</div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 65816 addresses 24 bits: 16 MB in 256 banks of 64 KB, written bank:offset.</li>
+              <li>PBR sets the code bank, DBR the data bank, D the direct-page window — together they reach the whole space.</li>
+              <li>WRAM is $7E–$7F, with its low 8 KB mirrored into every system bank; PPU $2100, APU $2140, CPU/DMA $4200/$4300.</li>
+              <li>Cartridge ROM occupies the upper halves of banks and the big upper banks; the exact layout is the mapper's job.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#width"><span class="dir">← Prev</span><span class="ttl">08 · 8-bit or 16-bit? The M &amp; X flags</span></a>
+            <a class="next" href="#dma"><span class="dir">Next →</span><span class="ttl">10 · DMA — feeding the PPU fast</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 10 --- -->
+      <section class="doc" id="dma">
+        <div class="mod-head">
+          <span class="eye">Module 10 <span class="part-tag">· Part II</span></span>
+          <h3>DMA — feeding the PPU fast</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">See how the 5A22's DMA controller shovels blocks of memory into the PPU far faster than the CPU could — and why the CPU stops dead while it does.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            A frame of SNES graphics needs a <em>lot</em> of data poured into the
+            PPU during V-blank: new tiles into VRAM, new colours into the palette,
+            new sprites into OAM. Doing it with the CPU — a loop of load, store,
+            load, store — is painfully slow, and V-blank is short. So the 5A22
+            includes a
+            <span class="term" data-tip="Direct Memory Access — a hardware engine that copies a block of memory by itself, without the CPU executing load/store instructions for each byte. The SNES has eight DMA channels.">DMA</span>
+            controller: eight channels that copy a block of memory from anywhere
+            (the &ldquo;A-bus&rdquo; source) to a fixed hardware port (the
+            &ldquo;B-bus&rdquo; destination) at roughly one byte per bus cycle.
+          </p>
+          <p>
+            You set a channel up by writing its registers at
+            <code>$43x0–$43x6</code> (where <em>x</em> is the channel number): the
+            control byte and transfer pattern, the destination port, the 24-bit
+            source address, and the byte count. Then you write a single bit to
+            <strong><code>$420B</code></strong> (MDMAEN) to arm the channels you
+            want, and the transfer fires immediately. A common destination is
+            <code>$2118/$2119</code>, the VRAM data port — feed it a stream and the
+            PPU fills video memory. The <strong>transfer pattern</strong> chooses
+            how bytes fan out across the destination ports: one register (mode 0),
+            alternating two (mode 1, perfect for the low/high VRAM pair), and so on.
+          </p>
+          <p>
+            The price is right there in the name of the enable register:
+            <strong>while a DMA runs, the CPU is halted</strong>. The DMA engine
+            owns the bus; the processor simply stops until the transfer completes.
+            That's fine — DMA moves data at about <strong>2.68&nbsp;MB/s</strong>,
+            roughly 8 master cycles per byte, so even a big transfer fits inside
+            V-blank, and the CPU wasn't going to do anything useful mid-blank
+            anyway. It's a deliberate trade: pause the thinker so the mover can go
+            flat out.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The bucket chain vs the fire hose</span>
+            <p>
+              The CPU copying bytes one instruction at a time is a bucket chain:
+              correct, but slow, and it ties up everyone. DMA is a fire hose bolted
+              straight from the reservoir to the fire — you turn one valve
+              (<code>$420B</code>) and it pours. You can't do anything else while
+              the hose is running full-bore, but you don't need to: it's done in a
+              blink.
+            </p>
+          </div>
+
+          <p>
+            The lab is a channel you configure and fire. Pick a destination port
+            and transfer pattern, set a byte count, and press Run: watch bytes
+            stream from work RAM into the PPU port while the cycle counter climbs
+            and the CPU sits halted. The elapsed microseconds show why DMA, not a
+            CPU loop, is how the SNES moves graphics.
+          </p>
+
+          <div class="lab" id="lab-dma">
+            <div class="lab-head"><span class="dot"></span><span class="title">DMA lab — configure a channel &amp; watch it stream</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <canvas class="dma-canvas" aria-label="Bytes streaming from work RAM to a PPU port during a DMA transfer"></canvas>
+              <div class="stat-row">
+                <span class="stat-chip">cost <b data-dma-cyc>—</b></span>
+                <span class="stat-chip">wall time <b data-dma-time>—</b></span>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Destination port</label>
+                  <select data-dma-dest aria-label="DMA destination port">
+                    <option value="$2118">$2118 VRAM data</option>
+                    <option value="$2122">$2122 CGRAM (palette)</option>
+                    <option value="$2104">$2104 OAM (sprites)</option>
+                  </select>
+                </div>
+                <div class="ctrl">
+                  <label>Transfer pattern</label>
+                  <select data-dma-mode aria-label="DMA transfer mode">
+                    <option value="1" selected>mode 1 · 2 regs ($2118/9)</option>
+                    <option value="0">mode 0 · 1 reg</option>
+                    <option value="2">mode 2 · 1 reg ×2</option>
+                  </select>
+                </div>
+                <div class="ctrl">
+                  <label>Byte count — <span class="val" data-dma-count-val>16 bytes</span></label>
+                  <input type="range" min="4" max="512" value="16" step="4" data-dma-count aria-label="Byte count">
+                </div>
+                <button class="play-btn" data-dma-run>Run transfer</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>DMA is a hardware copy engine — eight channels that move blocks from memory to a fixed hardware port.</li>
+              <li>Configure a channel at $43x0–$43x6, then arm it with a bit in $420B (MDMAEN); the transfer fires at once.</li>
+              <li>Transfer patterns fan bytes across destination ports — mode 1 feeds the $2118/$2119 VRAM pair.</li>
+              <li>DMA runs at ~2.68 MB/s (≈ 8 master cycles/byte) and halts the CPU for its duration — a deliberate trade.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#banks"><span class="dir">← Prev</span><span class="ttl">09 · The 24-bit address space</span></a>
+            <a class="next" href="#hdma"><span class="dir">Next →</span><span class="ttl">11 · HDMA — mid-frame magic</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 11 --- -->
+      <section class="doc" id="hdma">
+        <div class="mod-head">
+          <span class="eye">Module 11 <span class="part-tag">· Part II</span></span>
+          <h3>HDMA — mid-frame magic</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand H-blank DMA: a tiny table-driven transfer every scanline that lets one register change value down the screen — the source of gradients and per-line effects.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Module 10's DMA runs once, in a burst, during V-blank. Its sibling is
+            cleverer. <strong>HDMA</strong> — horizontal-blank DMA — performs a
+            <em>tiny</em> transfer <em>every scanline</em>, in the sliver of time
+            between drawing one line and the next. Instead of one big block up
+            front, HDMA drips a handful of bytes to a hardware register 224 times a
+            frame, so that register can hold a <em>different value on every line of
+            the screen</em>. That single idea is behind a huge fraction of the
+            SNES's signature look.
+          </p>
+          <p>
+            You arm HDMA channels by writing <strong><code>$420C</code></strong>
+            (HDMAEN) instead of $420B, and each channel reads from a
+            <span class="term" data-tip="A small table in memory that HDMA walks one entry per scanline group. Each entry starts with a line-count byte (how many lines it applies to) followed by the data to write — or, in indirect mode, a pointer to that data.">table</span>
+            in memory. The table format is compact: a <strong>line-count byte</strong>
+            says how many scanlines this entry covers, followed by the data to
+            write to the target register — or, in <strong>indirect</strong> mode, a
+            pointer to that data. A line-count byte of <code>$00</code> ends the
+            table. The CPU sets the table up once; the HDMA hardware then walks it
+            automatically, line by line, all frame, for free.
+          </p>
+          <p>
+            What can you paint with a register that changes every line? A colour
+            gradient in the sky (drip a slightly different colour to the fixed-colour
+            register each line). Per-line scrolling to shear the screen into
+            parallax layers or wavy water. Changing the Mode 7 transformation matrix
+            each line to bend a flat plane into a curved horizon. Moving the window
+            registers to carve circular spotlights and iris wipes. All of it is
+            &ldquo;change one register, every scanline&rdquo; — and all of it is
+            HDMA.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · Repainting the fence as the parade passes</span>
+            <p>
+              A single-DMA burst is painting the whole fence one colour before the
+              parade starts. HDMA is a painter who dabs one fresh shade on the fence
+              in the instant between each float passing — so by the end the fence is
+              a smooth rainbow, even though only a dab was applied at a time. The
+              &ldquo;instant between floats&rdquo; is
+              <span class="term" data-tip="Horizontal blanking — the brief gap after one scanline is drawn and before the next begins. HDMA does its per-line work here, invisibly.">H-blank</span>;
+              the dab is the tiny per-line transfer.
+            </p>
+          </div>
+
+          <p>
+            The lab is HDMA painting a sky. It writes the fixed-colour register
+            <code>$2132</code> a new value on each scanline, interpolating between a
+            top and bottom colour you pick — and animates the beam filling the
+            gradient line by line, exactly as the hardware would. The table on the
+            side shows the line-count/value entries the CPU would set up once.
+          </p>
+
+          <div class="lab" id="lab-hdma">
+            <div class="lab-head"><span class="dot"></span><span class="title">HDMA lab — a gradient, one scanline at a time</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="addr-grid">
+                <div>
+                  <canvas class="hdma-canvas" aria-label="A vertical colour gradient painted scanline by scanline by HDMA"></canvas>
+                </div>
+                <div>
+                  <div class="lab-sub" style="margin-bottom:8px">The HDMA table (set up once)</div>
+                  <div class="addr-steps" data-hdma-table></div>
+                </div>
+              </div>
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Top colour (hue)</label>
+                  <input type="range" min="180" max="260" value="210" step="1" data-hdma-top aria-label="Top hue">
+                </div>
+                <div class="ctrl">
+                  <label>Bottom colour (hue)</label>
+                  <input type="range" min="20" max="200" value="45" step="1" data-hdma-bot aria-label="Bottom hue">
+                </div>
+                <button class="play-btn" data-hdma-run>Paint the frame</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>HDMA does a small transfer every scanline, in H-blank, so a register can change value down the screen.</li>
+              <li>Channels are armed by $420C (HDMAEN) and driven by a table: a line-count byte plus data, or a pointer (indirect).</li>
+              <li>It powers gradients, per-line scroll and parallax, per-line Mode 7 matrices, and window shapes.</li>
+              <li>The CPU builds the table once; the hardware walks it automatically all frame, for free.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#dma"><span class="dir">← Prev</span><span class="ttl">10 · DMA — feeding the PPU fast</span></a>
+            <a class="next" href="#math"><span class="dir">Next →</span><span class="ttl">12 · The math registers</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 12 --- -->
+      <section class="doc" id="math">
+        <div class="mod-head">
+          <span class="eye">Module 12 <span class="part-tag">· Part II</span></span>
+          <h3>The math registers</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Use the 5A22's hardware multiply and divide — a peripheral the 65816 core lacks — and learn why you must wait a set number of cycles before reading the answer.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            The 65816 core has add, subtract, and bit operations — but
+            <em>no multiply and no divide instruction</em>. Doing them in software
+            is slow, and games need them constantly (scaling, positioning, dividing
+            a span into steps). So Ricoh built a small
+            <strong>multiply/divide unit</strong> into the 5A22, reached not through
+            instructions but through <strong>memory-mapped registers</strong>: you
+            write the operands to certain addresses, wait, then read the result back
+            from others. It's a peripheral, like DMA — the core just moves bytes to
+            and from it.
+          </p>
+          <p>
+            <strong>Multiply</strong> is unsigned 8×8→16. Write the first operand to
+            <code>$4202</code> and the second to <code>$4203</code>; writing
+            <code>$4203</code> starts the calculation. After <strong>8 CPU
+            cycles</strong> the 16-bit product is waiting in
+            <code>$4216</code> (low) and <code>$4217</code> (high).
+            <strong>Divide</strong> is unsigned 16÷8. Write the 16-bit dividend to
+            <code>$4204/$4205</code> and the 8-bit divisor to <code>$4206</code>;
+            writing <code>$4206</code> starts it. After <strong>16 cycles</strong>
+            the quotient sits in <code>$4214/$4215</code> and the remainder in
+            <code>$4216/$4217</code>.
+          </p>
+          <p>
+            That <em>wait</em> is the crucial detail. The unit isn't instantaneous —
+            it grinds through the math over those 8 or 16 cycles. Read the result
+            registers <em>too early</em> and you get a half-finished value, a subtle
+            bug that plagued real 65816 programmers. In practice you just make sure a
+            few instructions pass between writing the last operand and reading the
+            result — easy once you know, mysterious if you don't. (And an emulator
+            has to model exactly this delay to run buggy games faithfully — a Part III
+            theme.)
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The vending machine</span>
+            <p>
+              You put in your operands (press the buttons), and the machine whirs.
+              Reach into the tray immediately and it's empty — the can hasn't dropped
+              yet. Wait the few seconds it takes and the answer is there. The math
+              unit is exactly this: the whir is those 8 or 16 cycles, and grabbing the
+              tray early gets you nothing useful.
+            </p>
+          </div>
+
+          <p>
+            The lab is the math unit with its wait modelled. Choose multiply or
+            divide, set the operands, and press Go: the cycle bar fills over the 8 or
+            16 cycles, and only when it's done do the result registers show the true
+            answer. Notice the register names match the real hardware — and that the
+            product and the division's remainder share <code>$4216/$4217</code>.
+          </p>
+
+          <div class="lab" id="lab-math">
+            <div class="lab-head"><span class="dot"></span><span class="title">Math-unit lab — multiply / divide with the cycle wait</span><span class="badge">simulated · live</span></div>
+            <div class="lab-body">
+              <div class="controls">
+                <div class="ctrl">
+                  <label>Operation</label>
+                  <div class="seg-btns" role="group" aria-label="Math operation">
+                    <button class="on" data-math-mode="mul">multiply 8×8</button>
+                    <button data-math-mode="div">divide 16÷8</button>
+                  </div>
+                </div>
+                <div class="ctrl">
+                  <label data-math-a-lbl>Multiplicand · $4202 (8-bit)</label>
+                  <input type="range" min="0" max="255" value="12" step="1" data-math-a aria-label="Operand A">
+                  <span class="val" data-math-a-val>12</span>
+                </div>
+                <div class="ctrl">
+                  <label data-math-b-lbl>Multiplier · $4203 (8-bit)</label>
+                  <input type="range" min="0" max="255" value="10" step="1" data-math-b aria-label="Operand B">
+                  <span class="val" data-math-b-val>10</span>
+                </div>
+                <button class="play-btn" data-math-go>Go</button>
+              </div>
+              <div>
+                <div class="lab-sub" style="margin-bottom:6px">Cycle wait</div>
+                <div class="cyc-track"><div class="cyc-fill" data-math-cyc></div></div>
+                <div class="addr-step" style="margin-top:8px" data-math-cyc-txt>write the operands, then start the unit</div>
+              </div>
+              <div class="math-regs" data-math-regs></div>
+            </div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>The 65816 core can't multiply or divide; the 5A22 adds a hardware unit reached through memory-mapped registers.</li>
+              <li>Multiply (8×8→16): write $4202 and $4203, wait 8 cycles, read the product from $4216/$4217.</li>
+              <li>Divide (16÷8): write $4204/5 and $4206, wait 16 cycles, read quotient $4214/5 and remainder $4216/7.</li>
+              <li>You must wait the cycles before reading — an early read returns a half-finished value.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#hdma"><span class="dir">← Prev</span><span class="ttl">11 · HDMA — mid-frame magic</span></a>
+            <a class="next" href="#interp"><span class="dir">Next → Part III</span><span class="ttl">13 · Interpreters &amp; cycle accuracy</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ PART III ============ -->
+      <section class="part" id="part-3">
+        <div class="part-inner">
+          <div class="kicker">Part III</div>
+          <h3>Emulating it in bsnes</h3>
+          <p>
+            Finally: how does software on your PC stand in for the whole 5A22 —
+            the CPU, the PPU drawing beam, the sound chip, the DMA engines — all
+            at once, and all in step? Your processor can't run a single 65816
+            instruction, so an emulator must interpret them; but the harder half
+            is <em>timing</em>, because on real hardware everything shares one
+            clock. These three modules cover how bsnes runs the CPU, the accuracy
+            traps that separate a screenshot-correct emulator from a truthful one,
+            and the debuggers where you can watch it all with your own eyes.
+          </p>
+          <div class="part-meta"><span>Modules <b>13–15</b></span><span>Difficulty <b>Emulation</b></span><span>Labs <b>callbacks to Part I–II</b></span></div>
+        </div>
+      </section>
+
+      <!-- --- Module 13 --- -->
+      <section class="doc" id="interp">
+        <div class="mod-head">
+          <span class="eye">Module 13 <span class="part-tag">· Part III</span></span>
+          <h3>Interpreters &amp; cycle accuracy</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Understand how bsnes interprets the 65816 on a single shared master-clock scheduler — and why stepping one clock at a time is what makes it faithful.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            Strip the problem to its core: bsnes holds the game's memory in a big
+            array, and in that array sit 65816 instructions — numbers, as Module
+            01 taught you. Your CPU can't execute them, so bsnes runs an
+            <span class="term" data-tip="An emulator core that re-enacts fetch–decode–execute in software: read the opcode byte, look up what it means, run a handler that updates the emulated registers and memory, repeat.">interpreter</span>:
+            a software re-enactment of the fetch–decode–execute loop. It keeps a
+            variable for the PC and for each of the 65816's registers, reads the
+            opcode byte at PC, looks at it, jumps to the matching handler
+            (&ldquo;this is <code>ADC</code>: add this memory value to the emulated
+            A, set the flags&rdquo;), advances the virtual PC, and repeats. It is
+            Module 01's toy lab, grown up to the full instruction set — including
+            the M/X width tracking from Module 08, which the interpreter must
+            follow byte by byte.
+          </p>
+          <p>
+            But the Super Nintendo is not just a CPU. While the CPU runs, the PPU
+            is drawing the beam across the screen, the APU's SPC700 is generating
+            sound, and the DMA engines may be moving memory — and on real hardware
+            <em>all of them share the one 21.477&nbsp;MHz master clock</em> from
+            Module 06. The genius of bsnes is that it emulates that literally. A
+            single <strong>scheduler</strong> steps every component off the same
+            master clock: run the CPU forward a few clocks, run the PPU forward the
+            same few, run the APU, keep them all pinned to the same instant. This
+            is <strong>cycle accuracy</strong> — the emulator's model of time is the
+            hardware's model of time.
+          </p>
+          <p>
+            The alternative, which faster emulators of the past took, is
+            <strong>instruction stepping</strong>: run a whole CPU instruction, then
+            catch the other chips up in a lump. It's quicker, but it smears time —
+            the PPU &ldquo;sees&rdquo; the CPU's writes only at instruction
+            boundaries, not at the exact clock they happened. For most games that's
+            invisible. For the ones that lean on the precise interleaving of CPU,
+            PPU and DMA — reading a beam-position counter mid-instruction, timing an
+            effect to a specific clock — only the shared single-clock model gets it
+            right. That's why bsnes's author built it around one clock: <em>one
+            clock matters</em> because the real machine only ever had one.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The orchestra and the one conductor</span>
+            <p>
+              An orchestra where each player follows their own watch drifts apart in
+              seconds. A real orchestra follows one conductor's baton — every player
+              on the same beat. Instruction stepping is players glancing at the
+              score only at the end of each bar; cycle accuracy is watching the baton
+              on every single beat. The
+              <span class="term" data-tip="Emulating so that the CPU, PPU, APU and DMA all advance off one shared master clock, tick by tick, exactly as the hardware does — rather than running one whole instruction and catching the rest up afterward.">master-clock scheduler</span>
+              is that conductor, and the 5A22's 21.477 MHz clock is the beat.
+            </p>
+          </div>
+
+          <div class="note hw">
+            <div class="ico">⌁</div>
+            <div><p><strong>Look back at the toy CPU (Module 01).</strong> An
+            interpreter is literally that lab, scaled up: a PC variable, register
+            variables, a dispatch on the opcode, a handler per instruction. bsnes
+            genuinely contains one — the difference is that its loop advances a
+            shared clock every step, so the drawing beam and the sound chip stay
+            welded to the CPU at all times.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>An interpreter re-enacts fetch–decode–execute in software: a PC, register variables, a per-opcode handler.</li>
+              <li>bsnes steps the CPU, PPU, APU and DMA off one shared 21.477 MHz master clock — a single scheduler.</li>
+              <li>Cycle-stepping keeps every chip pinned to the same instant; instruction-stepping smears time to boundaries.</li>
+              <li>One clock matters because the real console only ever had one — games can depend on the exact interleaving.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#math"><span class="dir">← Prev · Part II</span><span class="ttl">12 · The math registers</span></a>
+            <a class="next" href="#accuracy"><span class="dir">Next →</span><span class="ttl">14 · The accuracy traps</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 14 --- -->
+      <section class="doc" id="accuracy">
+        <div class="mod-head">
+          <span class="eye">Module 14 <span class="part-tag">· Part III</span></span>
+          <h3>The accuracy traps</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Tour the places where a fast SNES emulator and a truthful one pull apart: open bus, DMA/HDMA timing, the H/V counters, early IRQs, and the notorious CPU↔APU boot sync.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            If Module 13 made cycle accuracy sound like a solved recipe, this module
+            is the cold shower. The traps are all the things the real 5A22 does
+            <em>implicitly</em> — leftover values on the bus, transfers that steal
+            exact cycles, counters that tick with the beam, chips that must agree at
+            boot — which software has to reproduce <em>explicitly</em> and precisely.
+            Miss one and the emulator isn't slow; it's <em>wrong</em>, often in a way
+            that only shows up in one scene of one game.
+          </p>
+
+          <h4>Trap 1 · Open bus</h4>
+          <p>
+            Not every address has hardware behind it. When the CPU reads an
+            unmapped address, real silicon doesn't return a clean zero — it returns
+            whatever value was <em>last on the bus</em>, because nothing drove new
+            bits onto the wires. This is
+            <span class="term" data-tip="Reading an unmapped address returns the last value that happened to be on the data bus, because no hardware drives fresh bits. Games sometimes rely on the specific leftover value.">open bus</span>,
+            and some games genuinely depend on the specific leftover value they get
+            back. An emulator that returns 0 (or a random number) there will run most
+            games and then mysteriously break the one that read open bus on purpose.
+          </p>
+
+          <h4>Trap 2 · DMA and HDMA steal exact cycles</h4>
+          <p>
+            Module 10's DMA halts the CPU — but for <em>exactly</em> how long, and
+            starting on <em>exactly</em> which master cycle, matters. HDMA is worse:
+            it interrupts the CPU for a few cycles on <em>every</em> scanline, at a
+            precise point in H-blank, and the amount stolen depends on how many
+            channels are active and their transfer sizes. Get the count or the timing
+            of these steals slightly wrong and any game that counts cycles — or times
+            an effect against the beam — drifts out of sync.
+          </p>
+
+          <h4>Trap 3 · The H/V counters and the &ldquo;early IRQ&rdquo;</h4>
+          <p>
+            The PPU exposes <strong>horizontal and vertical counters</strong> — where
+            the drawing beam is right now — and the CPU can latch and read them, and
+            program an IRQ to fire at a chosen beam position. The exact relationship
+            between the CPU's clock and those counters is delicate, and there's a
+            famous class of bug where an
+            <span class="term" data-tip="A well-known SNES emulation subtlety: a beam-position IRQ that fires one CPU cycle earlier (or later) than the hardware, because the H/V counter-to-CPU timing was modelled imprecisely.">IRQ fires one cycle early</span>
+            because the counter-to-CPU timing was modelled a hair off. One cycle is
+            enough to make a raster effect tear or a game hang.
+          </p>
+
+          <h4>Trap 4 · The CPU↔APU boot handshake</h4>
+          <p>
+            The single most infamous trap. The sound subsystem is a whole separate
+            CPU — the <strong>SPC700</strong> — running on its own clock, and the two
+            processors talk through the four mailbox ports at
+            <code>$2140–$2143</code> (Module 09). At boot they perform a precise
+            <span class="term" data-tip="At startup the main CPU uploads the sound program to the SPC700 through the $2140–$2143 ports using a handshake protocol. Games rely on the timing of the SPC700's boot ROM responses; if the emulator's two clocks aren't aligned, the upload desyncs and the game hangs.">handshake</span>:
+            the main CPU uploads the sound driver, and both sides step through an
+            agreed protocol whose timing games silently rely on. Because the two chips
+            run on <em>different</em> clocks that only bsnes-style scheduling keeps
+            correctly related, a small timing error makes the handshake desync — and
+            the game hangs on a black screen at boot. Whole eras of emulators fought
+            this exact bug.
+          </p>
+
+          <div class="analogy">
+            <span class="lbl">Analogy · The certified flight simulator</span>
+            <p>
+              A flight sim that only looks right is a video game; one a licensing
+              examiner accepts must match the aircraft's numbers, because pilots build
+              reflexes against the real machine's behaviour, not its appearance. Games
+              are those pilots: a thousand accidental dependencies on open-bus values,
+              exact DMA steals, precise counter timing and the boot handshake.
+              <strong>Fast</strong> gets the plane in the air; <strong>accurate</strong>
+              is what keeps three decades of software from noticing it changed aircraft.
+            </p>
+          </div>
+
+          <div class="note warn">
+            <div class="ico">▲</div>
+            <div><p><strong>Why not always be maximally accurate?</strong> Because
+            faithfully modelling every cycle-steal, counter and open-bus read is
+            expensive — the reason cycle-accurate cores like bsnes/higan need far more
+            host horsepower than the faster, looser emulators that came before. The art
+            is a model that's truthful where games can tell and cheap where they can't;
+            the reference cores simply refuse to cut the corners at all.</p></div>
+          </div>
+
+          <div class="takeaway">
+            <div class="th">Key takeaways</div>
+            <ul>
+              <li>Open bus: unmapped reads return the last value on the bus, and some games depend on it.</li>
+              <li>DMA and especially HDMA steal exact cycles at exact times; sloppy timing desyncs cycle-counting games.</li>
+              <li>The H/V beam counters feed IRQs, and mis-timing them by one cycle is a classic, visible bug.</li>
+              <li>The CPU↔APU (SPC700) boot handshake across separate clocks is the notorious make-or-break sync.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#interp"><span class="dir">← Prev</span><span class="ttl">13 · Interpreters &amp; cycle accuracy</span></a>
+            <a class="next" href="#try"><span class="dir">Next →</span><span class="ttl">15 · Try it in bsnes / Mesen</span></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- Module 15 --- -->
+      <section class="doc" id="try">
+        <div class="mod-head">
+          <span class="eye">Module 15 <span class="part-tag">· Part III</span></span>
+          <h3>Try it in bsnes / Mesen</h3>
+          <div class="objective"><span class="lbl">Goal</span><span class="txt">Turn the whole course into things you can watch for yourself — the debuggers, tracers and register viewers — then close the loop back to Module 01.</span></div>
+        </div>
+        <div class="prose">
+          <p>
+            You now have the full picture, so let's make it hands-on. Modern SNES
+            emulators ship debuggers that expose every mechanism this course
+            described. <strong>Mesen</strong> (and <strong>bsnes-plus</strong>) give
+            you a full 65816 debugger; both are cycle-accurate enough to trust what
+            they show you. Here's what to open and what you'll recognise:
+          </p>
+          <ul>
+            <li><strong>The disassembler &amp; CPU register view</strong> — see A, X, Y, S, the P flags (including <code>M</code> and <code>X</code>), and the PBR/DBR/D bank registers live. Watch the flags flip on a <code>REP</code>/<code>SEP</code> and the disassembly re-length its immediates, exactly as your Module 08 lab did.</li>
+            <li><strong>The trace logger</strong> — dump every instruction the CPU executes, with the effective address each addressing mode resolved to (Module 04) and the cycle it ran on. This is the fetch–decode–execute loop of Module 01, written to a file.</li>
+            <li><strong>Breakpoints &amp; the memory viewer</strong> — break when the code writes <code>$420B</code> (a DMA kicking off, Module 10) or <code>$420C</code> (HDMA, Module 11), or reads <code>$4216</code> (a multiply result, Module 12). Watch the memory map from Module 09 light up as regions are touched.</li>
+            <li><strong>The event/PPU viewer</strong> — see NMI fire at V-blank and IRQs at their beam positions (Module 06), and watch HDMA writes march down the scanlines painting a gradient (Module 11).</li>
+          </ul>
+
+          <h4>Three experiments worth actually running</h4>
+          <ul>
+            <li><strong>Catch a mode switch.</strong> Set a breakpoint on the first <code>XCE</code> after boot and step it. You'll watch the machine leave 6502 emulation mode and become the 16-bit 65816 — Module 08, live, on the first few instructions of nearly every game.</li>
+            <li><strong>Follow a DMA.</strong> Break on a write to <code>$420B</code>, then read the channel registers at <code>$4300–$4306</code> the game just set up: source, destination port, size. You've just decoded a real transfer by hand (Module 10).</li>
+            <li><strong>Watch HDMA paint.</strong> Find a game with a gradient sky, open the PPU/event viewer, and watch a colour register change value scanline by scanline (Module 11). The gradient in your lab is happening for real, 224 times a frame.</li>
+          </ul>
+
+          <p>
+            And that's the course. You began with a cook and a stack of numbered
+            cards; you end able to read a 65816 trace, explain why the same bytes
+            can decode two ways, and predict which register a DMA or the math unit
+            will touch. The fetch–decode–execute loop from Module 01 is still down
+            there, under everything, turning — on a 1990 games console, on the
+            machine you're reading this with, and in bsnes faithfully pretending to
+            be one on the other, one shared clock at a time.
+          </p>
+
+          <div class="takeaway">
+            <div class="th">Course complete ✦</div>
+            <ul>
+              <li>You can trace a frame end-to-end: the CPU sets up DMA/HDMA, the beam draws, NMI fires at V-blank, repeat.</li>
+              <li>You know the 65816 model — A/X/Y/S/P, the M &amp; X width flags, the 24-bit banked address space — and the 5A22's DMA, HDMA and math peripherals.</li>
+              <li>You understand why bsnes runs everything off one master clock, and the accuracy traps that make it hard.</li>
+              <li>You can open a debugger and map every register and event to a mechanism you now understand.</li>
+            </ul>
+          </div>
+
+          <div class="mod-nav">
+            <a href="#accuracy"><span class="dir">← Prev</span><span class="ttl">14 · The accuracy traps</span></a>
+            <a class="next" href="#loop"><span class="dir">↺ Restart</span><span class="ttl">01 · The fetch–decode–execute loop</span></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          An interactive course in the &ldquo;Inside the Super Nintendo&rdquo;
+          collection. Every lab on this page is a from-scratch simulation written
+          for teaching — no game code, no copyrighted material, nothing emulated
+          for real. Hardware details are grounded in public documentation of the
+          65816 and the Ricoh 5A22; figures we couldn't pin down precisely are
+          marked &ldquo;about&rdquo; on purpose.
+        </p>
+        <p class="src">
+          Register map · <code>$2100–$213F PPU</code> ·
+          <code>$2140–$2143 APU</code> · <code>$4200–$421F CPU</code> ·
+          <code>$4300–$437F DMA</code> · WRAM <code>$7E–$7F</code>
+        </p>
+      </footer>
+
+    </div><!-- /wrap -->
+  </main>
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
