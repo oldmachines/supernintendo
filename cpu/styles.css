@@ -1099,3 +1099,11 @@ select, .seg-btns {
 .cyc-track { height: 14px; border-radius: 7px; background: var(--line); overflow: hidden; position: relative; }
 .cyc-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, var(--violet-d), var(--violet)); transition: width .12s linear; }
 .cyc-fill.ready { background: linear-gradient(90deg, #23b8a8, var(--cyan)); }
+
+/* ---- Back-link to the oldmachines hub site (sidebar) ---- */
+.collection-link{
+  display:inline-flex; align-items:center; gap:7px; margin:0 0 16px;
+  font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted);
+}
+.collection-link:hover{ color:var(--ink); text-decoration:none; }
