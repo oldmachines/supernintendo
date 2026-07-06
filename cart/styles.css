@@ -1034,3 +1034,11 @@ tbody tr.dim { opacity: .28; }
 .xlate { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; }
 .xlate .swap { font: 700 18px/1 var(--mono); color: var(--violet); text-align: center; }
 @media (max-width: 560px) { .xlate { grid-template-columns: 1fr; } .xlate .swap { transform: rotate(90deg); } }
+
+/* ---- Back-link to the oldmachines hub site (sidebar) ---- */
+.collection-link{
+  display:inline-flex; align-items:center; gap:7px; margin:0 0 16px;
+  font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted);
+}
+.collection-link:hover{ color:var(--ink); text-decoration:none; }
